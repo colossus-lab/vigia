@@ -78,3 +78,6 @@ marketing/
 # Informes de seguridad — NUNCA se commitean (viven en el escritorio, fuera del repo)
 *SECURITY-REVIEW*
 SECURITY-REVIEW.md
+
+# Roadmap interno — solo local, no va al repo público (infra/IAM/estrategia)
+PLAN.md

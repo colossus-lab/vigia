@@ -4,7 +4,7 @@ Plataforma de inteligencia legislativa y regulatoria argentina (Colossus Lab,
 familia OpenArg). Monorepo full-stack **en producción**:
 
 - **Web**: https://vigia.openarg.org (Vercel, proyecto `colossus-lab/vigia`, Root Directory `apps/web`)
-- **API**: https://vigia-api.openarg.org (EC2 `vigia-production`, us-east-1, EIP 98.95.87.94)
+- **API**: https://vigia-api.openarg.org (EC2 all-in-one, us-east-1)
 - **Datos**: ~533k normas (InfoLEG completo + proyectos HCDN), actualización automática diaria.
 
 La arquitectura calca el patrón del lab (InvestArg/OpenArg): FastAPI async +
@@ -40,7 +40,7 @@ Build web: `pnpm build` en `apps/web`. Tests: `pytest packages/connectors/tests 
 ## Deploy a producción
 
 Push a `main` → CI `build-images` publica `ghcr.io/colossus-lab/vigia-{api,workers}` (públicas).
-En el EC2 (`ssh -i ~/.ssh/vigia.pem ec2-user@98.95.87.94`, repo clonado en `~/vigia`):
+En el EC2 (`ssh -i ~/.ssh/<key>.pem ec2-user@<EIP>`, repo clonado en `~/vigia`):
 
 ```bash
 cd vigia && git pull
@@ -79,4 +79,4 @@ con `prefers-reduced-motion`. El `<em>` en títulos display va en sol itálica.
 
 ## Roadmap pendiente
 
-Ver `PLAN.md` (Google OAuth es lo próximo).
+El roadmap interno (`PLAN.md`) vive solo local, fuera del repo público.
