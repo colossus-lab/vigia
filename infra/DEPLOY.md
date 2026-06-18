@@ -1,6 +1,6 @@
 # Deploy de Vigía — Runbook (Fase 4)
 
-> **Deploy real (2026-06):** EC2 all-in-one `vigia-production` (t3.small, us-east-1)
+> **Deploy real (2026-06):** EC2 all-in-one (t3.small, us-east-1)
 > con perfil `local-data` del compose. API en `https://vigia-api.openarg.org`,
 > web en `https://vigia.openarg.org` (Vercel). User-data en `infra/ec2-user-data.sh`.
 > Orden de arranque all-in-one (el `pull` evita que compose buildee en el EC2):
@@ -257,7 +257,7 @@ base vacía — para desastre total, recrear `db` con el compose y dejar que
 
 ```bash
 aws s3 cp s3://vigia-backups/vigia-YYYY-MM-DD.sql.gz - | gunzip | \
-  ssh -i ~/.ssh/vigia.pem ec2-user@98.95.87.94 \
+  ssh -i ~/.ssh/<key>.pem ec2-user@<EIP> \
   "docker compose -f ~/vigia/docker-compose.prod.yml exec -T db psql -U vigia -d vigia"
 ```
 
