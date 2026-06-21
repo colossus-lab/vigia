@@ -1,5 +1,6 @@
 import './globals.css';
 import Providers from '@/components/Providers';
+import { Analytics } from '@vercel/analytics/next';
 
 const TITLE = 'Vigía — Inteligencia Legislativa Argentina';
 const DESCRIPTION =
@@ -45,6 +46,7 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
