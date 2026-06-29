@@ -38,13 +38,6 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
-  // TEMP (captura video promo): proxy same-origin a la API pública de prod para
-  // saltar CORS en dev. Revertir junto con el .env.local al terminar la captura.
-  async rewrites() {
-    return [
-      { source: '/api-proxy/:path*', destination: 'https://vigia-api.openarg.org/:path*' },
-    ];
-  },
 };
 
 export default nextConfig;
