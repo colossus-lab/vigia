@@ -101,6 +101,16 @@ celery_app.conf.update(
             "task": "vigia_workers.societario.ingest_bora_segunda",
             "schedule": crontab(hour=10, minute=30),
         },
+        # BO CABA (API REST) — frescura diaria. Después de BORA 1ª (07:00).
+        "ingest-bocaba": {
+            "task": "vigia_workers.tasks.ingest_bocaba",
+            "schedule": crontab(hour=7, minute=15),
+        },
+        # BO Provincia de Buenos Aires (sección OFICIAL, PDF) — frescura diaria.
+        "ingest-pba": {
+            "task": "vigia_workers.tasks.ingest_pba",
+            "schedule": crontab(hour=9, minute=0),
+        },
         # Consultas públicas (señal temprana) — diario al mediodía.
         "ingest-consultas-publicas": {
             "task": "vigia_workers.tasks.ingest_consultas_publicas",

@@ -16,6 +16,21 @@ _MAX_DESTACADOS = 30
 _MAX_TRAMITE = 80
 
 
+def _apply_source(filters: list, source: str | None) -> None:
+    """Filtra por código(s) de fuente (lista separada por coma) vía source_catalog.
+
+    Habilita la sección "Boletines Oficiales": Nacional→bora_primera,infoleg;
+    PBA→bopba; CABA→bocaba.
+    """
+    if not source:
+        return
+    codes = [c.strip() for c in source.split(",") if c.strip()]
+    if codes:
+        filters.append(
+            Norma.source_id.in_(select(SourceCatalog.id).where(SourceCatalog.code.in_(codes)))
+        )
+
+
 @router.get("/ediciones")
 async def ediciones(
     dias: int = Query(7, ge=1, le=31, description="cuántas ediciones (días con normas) traer"),
@@ -23,6 +38,9 @@ async def ediciones(
     tipo: str | None = Query(None),
     sector: str | None = Query(None),
     emisor: str | None = Query(None, description="organismo canónico: ARCA|CNV|BCRA|…"),
+    source: str | None = Query(
+        None, description="códigos de fuente separados por coma: bora_primera,infoleg|bocaba|bopba"
+    ),
 ) -> dict:
     """El feed como diario: una edición por día, con jerarquía editorial.
 
@@ -38,6 +56,7 @@ async def ediciones(
         filters.append(Norma.sector == sector)
     if emisor:
         filters.append(Norma.emisor == emisor)
+    _apply_source(filters, source)
 
     async with Session() as session:
         fechas = (
@@ -103,6 +122,9 @@ async def list_normas(
     impacto: str | None = Query(None, description="alto|medio|bajo"),
     sector: str | None = Query(None),
     emisor: str | None = Query(None, description="organismo canónico: ARCA|CNV|BCRA|…"),
+    source: str | None = Query(
+        None, description="códigos de fuente separados por coma: bora_primera,infoleg|bocaba|bopba"
+    ),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0, le=100000),
 ) -> NormaPage:
@@ -116,6 +138,7 @@ async def list_normas(
         filters.append(Norma.sector == sector)
     if emisor:
         filters.append(Norma.emisor == emisor)
+    _apply_source(filters, source)
 
     async with Session() as session:
         total = (

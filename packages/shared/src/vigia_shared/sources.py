@@ -87,6 +87,24 @@ SOURCES: dict[str, dict] = {
         # ~5-15/mes: una nueva por mes ya es ritmo normal.
         "freshness_slo_days": 60,
     },
+    "bocaba": {
+        "code": "bocaba",
+        "name": "Boletín Oficial — Ciudad de Buenos Aires (CABA)",
+        "kind": "api",
+        "base_url": "https://api-restboletinoficial.buenosaires.gob.ar",
+        "cadence_hours": 24,
+        # Publica cada día hábil; 4 días tolera fin de semana largo (igual que BORA 1ª).
+        "freshness_slo_days": 4,
+    },
+    "bopba": {
+        "code": "bopba",
+        "name": "Boletín Oficial — Provincia de Buenos Aires (sección Oficial)",
+        "kind": "scrape",
+        "base_url": "https://boletinoficial.gba.gob.ar",
+        "cadence_hours": 24,
+        # Publica cada día hábil; 4 días tolera fin de semana largo.
+        "freshness_slo_days": 4,
+    },
     "bicameral_dnu": {
         "code": "bicameral_dnu",
         "name": "Comisión Bicameral DNU — dictámenes (datos.hcdn.gob.ar)",
