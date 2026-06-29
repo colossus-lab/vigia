@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from vigia_connectors import (
-    BoraAviso, BoraClient, HcdnClient, HcdnProyecto, InfoLegClient, InfoLegNorm,
-    SenadoClient, SenadoProyecto,
+    BoCabaClient, BoCabaNorma, BoPbaClient, BoPbaNorma, BoraAviso, BoraClient,
+    HcdnClient, HcdnProyecto, InfoLegClient, InfoLegNorm, SenadoClient, SenadoProyecto,
 )
 from vigia_connectors.bora import looks_like_dnu
 from vigia_connectors.emisores import detect_emisor
@@ -582,6 +582,127 @@ def ingest_consultas_publicas(dry_run: bool = False) -> dict[str, Any]:
         return {"source": SOURCE["code"], **counts}
 
     return run_async(_wrapped())
+
+
+def _bocaba_to_row(n: BoCabaNorma) -> dict[str, Any]:
+    """Mapea un BoCabaNorma al shape de `norma` (jurisdicción CABA)."""
+    return {
+        "external_id": n.external_id,
+        "tipo": n.tipo,
+        "numero": n.numero,
+        "titulo": n.titulo,
+        "resumen": n.sumario,
+        "resumen_ia": None,
+        "fecha_publicacion": n.fecha,
+        "jurisdiccion": "CABA",
+        "sector": n.detect_sector(),
+        "organismo": n.organismo,
+        "emisor": detect_emisor(n.organismo),
+        "estado": "Publicada",
+        "impacto": None,
+        "bora_seccion": None,
+        "entidades": None,
+        "tags": None,
+        "url": n.url,
+        "raw": {"nombre": n.nombre, "poder": n.poder, "id_norma": n.id_norma},
+    }
+
+
+@celery_app.task(name="vigia_workers.tasks.ingest_bocaba")
+def ingest_bocaba(dry_run: bool = False, dias: int = 5) -> dict[str, Any]:
+    """Ingesta el Boletín Oficial de CABA (API REST JSON) — últimos `dias`.
+
+    Una llamada por fecha trae todas las publicaciones del día; ingestamos los
+    actos normativos (Poderes Legislativo/Ejecutivo/Judicial + Órganos de
+    Control) y salteamos edictos, licitaciones y comunicados (avisos).
+    """
+    dry = _is_dry_run(dry_run)
+    SOURCE = catalog_fields("bocaba")
+
+    async def _run() -> dict[str, Any]:
+        async with BoCabaClient() as client:
+            normas = await client.fetch_recent(dias=dias)
+        rows = [_bocaba_to_row(n) for n in normas]
+        if dry:
+            return {"rows": len(rows), "sample": [_dry_sample_row(r) for r in rows[:_DRY_SAMPLE]]}
+        totals = _empty_totals()
+        for i in range(0, len(rows), _FULL_BATCH):
+            _acc(totals, await upsert_normas(SOURCE, rows[i : i + _FULL_BATCH]))
+        return totals
+
+    if dry:
+        result = run_async(_run())
+        return {"source": SOURCE["code"], "dry_run": True, **result}
+
+    async def _wrapped() -> dict[str, Any]:
+        counts = await with_status([SOURCE["code"]], _run)
+        return {"source": SOURCE["code"], **counts}
+
+    result = run_async(_wrapped())
+    # Tras ingestar, cruzar contra las alertas activas y notificar.
+    from vigia_workers.alerts import _match_all
+    result["matching"] = run_async(_match_all())
+    return result
+
+
+def _bopba_to_row(n: BoPbaNorma) -> dict[str, Any]:
+    """Mapea un BoPbaNorma al shape de `norma` (jurisdicción Buenos Aires)."""
+    return {
+        "external_id": n.external_id,
+        "tipo": n.tipo,
+        "numero": n.numero,
+        "titulo": n.titulo,
+        "resumen": n.resumen,
+        "resumen_ia": None,
+        "fecha_publicacion": n.fecha,
+        "jurisdiccion": "Buenos Aires",
+        "sector": n.detect_sector(),
+        "organismo": n.organismo,
+        "emisor": detect_emisor(n.organismo),
+        "estado": "Publicada",
+        "impacto": None,
+        "bora_seccion": None,
+        "entidades": None,
+        "tags": None,
+        "url": n.url,
+        "raw": {"rubro": n.rubro, "numero": n.numero},
+    }
+
+
+@celery_app.task(name="vigia_workers.tasks.ingest_pba")
+def ingest_pba(dry_run: bool = False, dias: int = 3) -> dict[str, Any]:
+    """Ingesta el BO de la Provincia de Buenos Aires (sección OFICIAL, PDF).
+
+    Solo normas (leyes/decretos/resoluciones/disposiciones); saltea societario,
+    licitaciones, edictos y las secciones Judicial/Jurisprudencia. Descarga
+    pesada (~29 MB por edición): `dias` chico.
+    """
+    dry = _is_dry_run(dry_run)
+    SOURCE = catalog_fields("bopba")
+
+    async def _run() -> dict[str, Any]:
+        async with BoPbaClient() as client:
+            normas = await client.fetch_recent(dias=dias)
+        rows = [_bopba_to_row(n) for n in normas]
+        if dry:
+            return {"rows": len(rows), "sample": [_dry_sample_row(r) for r in rows[:_DRY_SAMPLE]]}
+        totals = _empty_totals()
+        for i in range(0, len(rows), _FULL_BATCH):
+            _acc(totals, await upsert_normas(SOURCE, rows[i : i + _FULL_BATCH]))
+        return totals
+
+    if dry:
+        result = run_async(_run())
+        return {"source": SOURCE["code"], "dry_run": True, **result}
+
+    async def _wrapped() -> dict[str, Any]:
+        counts = await with_status([SOURCE["code"]], _run)
+        return {"source": SOURCE["code"], **counts}
+
+    result = run_async(_wrapped())
+    from vigia_workers.alerts import _match_all
+    result["matching"] = run_async(_match_all())
+    return result
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_infoleg_full")

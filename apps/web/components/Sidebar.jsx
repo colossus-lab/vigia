@@ -6,6 +6,7 @@ import { Newspaper, BarChart3, Search, Bell, Shield, X, Eye, Landmark, Building2
 
 const NAV_ITEMS = [
   { to: '/feed', label: 'Feed Normativo', icon: Newspaper },
+  { to: '/boletines', label: 'Boletines Oficiales', icon: Landmark },
   { to: '/dashboard', label: 'Estadísticas', icon: BarChart3 },
   { to: '/search', label: 'Buscador', icon: Search },
   { to: '/alerts', label: 'Alertas', icon: Bell },

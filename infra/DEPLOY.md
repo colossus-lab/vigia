@@ -202,6 +202,30 @@ docker compose -f docker-compose.prod.yml run --rm worker \
 5. Habilitar el beat (deploy con la entrada en `celery_app.py`).
 6. Smoke: `/health/sources` muestra la fuente en `ok` con `max_fecha` razonable.
 
+**Alta concreta — BO CABA (`bocaba`) y BO PBA (`bopba`)**: ambas ya traen task,
+beat y registry. En el EC2, por cada una (CABA usa API JSON; PBA baja PDFs ~29 MB/edición):
+
+```bash
+# dry-run (CABA / PBA)
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.tasks import ingest_bocaba as t; print(t(dry_run=True))"
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.tasks import ingest_pba as t; print(t(dry_run=True))"
+# backfill (subir `dias`/`dias` para más historia; PBA chico por el peso del PDF)
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.tasks import ingest_bocaba as t; print(t(dias=10))"
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.tasks import ingest_pba as t; print(t(dias=5))"
+# matching silencioso una vez, tras ambos backfills
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.alerts import match_alertas as t; print(t(notify=False))"
+```
+
+La sección web **Boletines Oficiales** (Nacional/PBA/CABA) consume
+`GET /normas/ediciones?source=bocaba|bopba`; las pestañas CABA/PBA muestran datos
+recién **después** del backfill (antes: "Sin ediciones"). Gotcha PBA: cert SSL roto
+→ el connector va con `verify_ssl=False` (ya seteado).
+
 **Rollback universal de una fuente** (cascade limpia matches y tracking):
 
 ```sql
