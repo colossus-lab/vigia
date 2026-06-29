@@ -196,9 +196,10 @@ docker compose -f docker-compose.prod.yml run --rm worker \
 **Alta de una fuente nueva** (siempre en este orden):
 1. Deploy del código con la task nueva, SIN beat todavía.
 2. Dry-run en el EC2 → revisar conteos y sample.
-3. Backfill real: correr la task una vez.
-4. **Matching silencioso** (evita spamear usuarios con normas viejas):
-   `python -c "from vigia_workers.alerts import match_alertas as t; print(t(notify=False))"`
+3. Backfill real **con `notify=False`**: la task cruza alertas pero NO manda mails
+   (evita spamear a los usuarios con el golpe de normas históricas). Las tasks de
+   ingesta notifican inline por default (`notify=True`, correcto para el beat diario).
+4. (Opcional, confirmación) `match_alertas(notify=False)` → debería dar `new_matches: 0`.
 5. Habilitar el beat (deploy con la entrada en `celery_app.py`).
 6. Smoke: `/health/sources` muestra la fuente en `ok` con `max_fecha` razonable.
 
@@ -211,14 +212,12 @@ docker compose -f docker-compose.prod.yml run --rm worker \
   python -c "from vigia_workers.tasks import ingest_bocaba as t; print(t(dry_run=True))"
 docker compose -f docker-compose.prod.yml run --rm worker \
   python -c "from vigia_workers.tasks import ingest_pba as t; print(t(dry_run=True))"
-# backfill (subir `dias`/`dias` para más historia; PBA chico por el peso del PDF)
+# backfill con notify=False (NO manda mails; subir `dias` para más historia,
+# PBA chico por el peso del PDF)
 docker compose -f docker-compose.prod.yml run --rm worker \
-  python -c "from vigia_workers.tasks import ingest_bocaba as t; print(t(dias=10))"
+  python -c "from vigia_workers.tasks import ingest_bocaba as t; print(t(dias=10, notify=False))"
 docker compose -f docker-compose.prod.yml run --rm worker \
-  python -c "from vigia_workers.tasks import ingest_pba as t; print(t(dias=5))"
-# matching silencioso una vez, tras ambos backfills
-docker compose -f docker-compose.prod.yml run --rm worker \
-  python -c "from vigia_workers.alerts import match_alertas as t; print(t(notify=False))"
+  python -c "from vigia_workers.tasks import ingest_pba as t; print(t(dias=5, notify=False))"
 ```
 
 La sección web **Boletines Oficiales** (Nacional/PBA/CABA) consume

@@ -98,7 +98,7 @@ def _norma_to_row(n: InfoLegNorm) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_infoleg")
-def ingest_infoleg(dry_run: bool = False) -> dict[str, Any]:
+def ingest_infoleg(dry_run: bool = False, notify: bool = True) -> dict[str, Any]:
     """Ingesta el muestreo de InfoLEG (~1000 normas). Rápido — bueno para dev."""
     dry = _is_dry_run(dry_run)
 
@@ -121,7 +121,7 @@ def ingest_infoleg(dry_run: bool = False) -> dict[str, Any]:
     result = run_async(_wrapped())
     # Tras ingestar, cruzar contra las alertas activas y notificar.
     from vigia_workers.alerts import _match_all
-    result["matching"] = run_async(_match_all())
+    result["matching"] = run_async(_match_all(notify=notify))
     return result
 
 
@@ -151,7 +151,7 @@ def _proyecto_to_row(p: HcdnProyecto) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_hcdn_proyectos")
-def ingest_hcdn_proyectos(dry_run: bool = False) -> dict[str, Any]:
+def ingest_hcdn_proyectos(dry_run: bool = False, notify: bool = True) -> dict[str, Any]:
     """Ingesta los proyectos parlamentarios de HCDN (CSV completo por streaming).
 
     El dataset se actualiza a diario en datos.hcdn.gob.ar; el upsert es
@@ -254,7 +254,7 @@ def ingest_senado_proyectos(dry_run: bool = False, max_pages: int = 3) -> dict[s
 
     result = run_async(_wrapped())
     from vigia_workers.alerts import _match_all
-    result["matching"] = run_async(_match_all())
+    result["matching"] = run_async(_match_all(notify=notify))
     return result
 
 
@@ -337,7 +337,7 @@ def _aviso_to_row(a: BoraAviso, tipo: str | None = None, texto: str | None = Non
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_bora_primera")
-def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5) -> dict[str, Any]:
+def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: bool = True) -> dict[str, Any]:
     """Ingesta la 1ª sección del BORA (edición del día + lookback de catch-up).
 
     El lookback re-scrapea los últimos N días: idempotente (upsert) y
@@ -427,7 +427,7 @@ def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5) -> dict[s
     from vigia_workers.reconcile import _reconcile
     result["reconcile"] = run_async(_reconcile())
     from vigia_workers.alerts import _match_all
-    result["matching"] = run_async(_match_all())
+    result["matching"] = run_async(_match_all(notify=notify))
     return result
 
 
@@ -609,7 +609,7 @@ def _bocaba_to_row(n: BoCabaNorma) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_bocaba")
-def ingest_bocaba(dry_run: bool = False, dias: int = 5) -> dict[str, Any]:
+def ingest_bocaba(dry_run: bool = False, dias: int = 5, notify: bool = True) -> dict[str, Any]:
     """Ingesta el Boletín Oficial de CABA (API REST JSON) — últimos `dias`.
 
     Una llamada por fecha trae todas las publicaciones del día; ingestamos los
@@ -641,7 +641,7 @@ def ingest_bocaba(dry_run: bool = False, dias: int = 5) -> dict[str, Any]:
     result = run_async(_wrapped())
     # Tras ingestar, cruzar contra las alertas activas y notificar.
     from vigia_workers.alerts import _match_all
-    result["matching"] = run_async(_match_all())
+    result["matching"] = run_async(_match_all(notify=notify))
     return result
 
 
@@ -670,7 +670,7 @@ def _bopba_to_row(n: BoPbaNorma) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_pba")
-def ingest_pba(dry_run: bool = False, dias: int = 3) -> dict[str, Any]:
+def ingest_pba(dry_run: bool = False, dias: int = 3, notify: bool = True) -> dict[str, Any]:
     """Ingesta el BO de la Provincia de Buenos Aires (sección OFICIAL, PDF).
 
     Solo normas (leyes/decretos/resoluciones/disposiciones); saltea societario,
@@ -701,7 +701,7 @@ def ingest_pba(dry_run: bool = False, dias: int = 3) -> dict[str, Any]:
 
     result = run_async(_wrapped())
     from vigia_workers.alerts import _match_all
-    result["matching"] = run_async(_match_all())
+    result["matching"] = run_async(_match_all(notify=notify))
     return result
 
 
