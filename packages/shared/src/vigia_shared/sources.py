@@ -28,10 +28,12 @@ SOURCES: dict[str, dict] = {
         "kind": "feed",
         "base_url": "https://datos.hcdn.gob.ar",
         "cadence_hours": 24,
-        # El portal de Diputados publica el dataset de forma irregular (baches de
-        # 1-2 semanas son normales, p.ej. recesos). 15d evita el ruido de alertas
-        # en cada bache habitual; sigue avisando si el atraso es realmente anómalo.
-        "freshness_slo_days": 15,
+        # El portal de Diputados refresca el dataset de forma MUY irregular: se
+        # observaron baches reales de 6+ semanas sin que sea anomalía (el freeze de
+        # 2026-06 llegó a >40d con el feed sano, solo dejaron de publicar). Con 15d
+        # esto alertaba en cada bache normal. 60d solo avisa si lleva ~2 meses sin
+        # avanzar, que sí sería un corte real del feed upstream.
+        "freshness_slo_days": 60,
     },
     "senado_proyectos": {
         "code": "senado_proyectos",
@@ -47,8 +49,9 @@ SOURCES: dict[str, dict] = {
         "kind": "scrape",
         "base_url": "https://www.boletinoficial.gob.ar",
         "cadence_hours": 24,
-        # Publica cada día hábil; 4 días tolera fin de semana largo.
-        "freshness_slo_days": 4,
+        # Publica cada día hábil; 5 días tolera feriado pegado al finde
+        # (jueves feriado + finde = miércoles→lunes sin edición).
+        "freshness_slo_days": 5,
     },
     "hcdn_movimientos": {
         "code": "hcdn_movimientos",
@@ -93,8 +96,8 @@ SOURCES: dict[str, dict] = {
         "kind": "api",
         "base_url": "https://api-restboletinoficial.buenosaires.gob.ar",
         "cadence_hours": 24,
-        # Publica cada día hábil; 4 días tolera fin de semana largo (igual que BORA 1ª).
-        "freshness_slo_days": 4,
+        # Publica cada día hábil; 5 días tolera feriado pegado al finde (igual que BORA 1ª).
+        "freshness_slo_days": 5,
     },
     "bopba": {
         "code": "bopba",
@@ -102,8 +105,8 @@ SOURCES: dict[str, dict] = {
         "kind": "scrape",
         "base_url": "https://boletinoficial.gba.gob.ar",
         "cadence_hours": 24,
-        # Publica cada día hábil; 4 días tolera fin de semana largo.
-        "freshness_slo_days": 4,
+        # Publica cada día hábil; 5 días tolera feriado pegado al finde.
+        "freshness_slo_days": 5,
     },
     "bicameral_dnu": {
         "code": "bicameral_dnu",
