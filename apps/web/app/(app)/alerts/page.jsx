@@ -12,10 +12,11 @@ const INPUT_CLS = 'w-full bg-transparent border-b border-border-light px-1 py-2 
 
 // Form reutilizable: alta y edición comparten markup. `initial` pre-carga
 // keywords/sectores; `onSubmit` recibe el payload limpio { keywords, sectores }.
-function AlertaForm({ initial, onSubmit, onCancel, submitLabel }) {
+function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
   const [keywords, setKeywords] = useState(initial?.keywords || []);
   const [sectores, setSectores] = useState(initial?.sectores || []);
   const [draft, setDraft] = useState('');
+  const [preview, setPreview] = useState(null); // { count_30d } | null
 
   const addKeyword = (raw) => {
     const kw = raw.trim();
@@ -29,17 +30,33 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel }) {
   const toggleSector = (s) =>
     setSectores((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]));
 
+  // Preview de volumen: "≈ N normas en 30 días" para el criterio actual.
+  // Debounced; solo con keywords confirmadas + sectores (ignora el draft a medio
+  // tipear). Mata alertas muertas (N=0) y avisa de las ruidosas antes de crearlas.
+  useEffect(() => {
+    if (!onPreview || (!keywords.length && !sectores.length)) { setPreview(null); return; }
+    let cancel = false;
+    const t = setTimeout(async () => {
+      try {
+        const p = await onPreview({ keywords, sectores });
+        if (!cancel) setPreview(p);
+      } catch { if (!cancel) setPreview(null); }
+    }, 400);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [keywords, sectores, onPreview]);
+
   const submit = () => {
     // Volcar lo que quede tipeado sin confirmar.
     const kws = draft.trim() && !keywords.includes(draft.trim()) ? [...keywords, draft.trim()] : keywords;
-    if (!kws.length) return;
+    // Válida con keywords O sectores (alerta por-sector = sin keywords).
+    if (!kws.length && !sectores.length) return;
     onSubmit({ keywords: kws, sectores });
   };
 
   return (
     <div className="animate-slide-up border-l-2 border-celeste pl-5 py-1">
       <div className="mb-4">
-        <label className="eyebrow text-[9px] block mb-2">Keywords <span className="text-text-tertiary normal-case font-normal">— Enter o coma para sumar (matchea cualquiera)</span></label>
+        <label className="eyebrow text-[9px] block mb-2">Keywords <span className="text-text-tertiary normal-case font-normal">— Enter o coma para sumar · opcional si elegís sectores</span></label>
         <div className="flex flex-wrap items-center gap-1.5">
           {keywords.map((kw) => (
             <span key={kw} className="flex items-center gap-1 text-[11px] font-mono tint-blue border px-2 py-0.5 rounded-full">
@@ -72,6 +89,14 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel }) {
         </div>
       </div>
 
+      {onPreview && preview && (
+        <p className="text-[11px] font-mono mb-4 text-text-tertiary">
+          {preview.count_30d === 0
+            ? '≈ 0 normas en los últimos 30 días — criterio muy angosto, revisá las keywords'
+            : `≈ ${preview.count_30d.toLocaleString('es-AR')} normas en los últimos 30 días${preview.count_30d > 200 ? ' · criterio amplio, vas a recibir bastante' : ''}`}
+        </p>
+      )}
+
       <div className="flex gap-3">
         <button onClick={submit} className="px-4 py-1.5 btn-celeste rounded-full text-[11px] font-bold">{submitLabel}</button>
         <button onClick={onCancel} className="px-3 py-1.5 text-text-secondary text-[11px] font-medium hover:text-text-primary transition-colors">Cancelar</button>
@@ -96,6 +121,13 @@ export default function AlertsView() {
       setAlertas(await authedFetch(jwt, '/alerts'));
     } catch (e) { setErr(String(e.message || e)); }
   }, [connected, jwt]);
+
+  // Preview de volumen para el form (solo con sesión: el endpoint pide auth).
+  const previewAlerta = useCallback(
+    (payload) => authedFetch(jwt, '/alerts/preview', { method: 'POST', body: JSON.stringify(payload) }),
+    [jwt],
+  );
+  const onPreview = connected ? previewAlerta : null;
 
   useEffect(() => { load(); }, [load]);
 
@@ -197,7 +229,7 @@ export default function AlertsView() {
       {showForm && (
         <div className="mb-10">
           <p className="eyebrow mb-4"><span className="eyebrow-num">+</span><span className="ml-2">Nueva alerta</span></p>
-          <AlertaForm initial={{ keywords: [], sectores: [] }} onSubmit={addAlerta} onCancel={() => setShowForm(false)} submitLabel="Crear" />
+          <AlertaForm initial={{ keywords: [], sectores: [] }} onSubmit={addAlerta} onCancel={() => setShowForm(false)} submitLabel="Crear" onPreview={onPreview} />
         </div>
       )}
 
@@ -213,6 +245,7 @@ export default function AlertsView() {
                   onSubmit={(payload) => saveEdit(alerta, payload)}
                   onCancel={() => setEditingId(null)}
                   submitLabel="Guardar"
+                  onPreview={onPreview}
                 />
                 <p className="text-[10px] text-text-tertiary font-mono mt-3 pl-5">Cambiar el criterio reinicia los matches: la alerta solo notifica normas nuevas desde la edición.</p>
               </div>
@@ -223,7 +256,11 @@ export default function AlertsView() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="text-[14px] font-semibold text-text-primary truncate" style={{ fontFamily: 'var(--font-display)' }}>
-                        “{(alerta.keywords || []).join('”, “')}”
+                        {(alerta.keywords || []).length
+                          ? `“${alerta.keywords.join('”, “')}”`
+                          : (alerta.sectores || []).length
+                            ? `Sectores: ${alerta.sectores.join(' · ')}`
+                            : 'Todas las normas'}
                       </h4>
                       {alerta.activa && <span className="text-[9px] font-medium tint-green border px-1.5 py-0.5 rounded-full shrink-0">activa</span>}
                     </div>
