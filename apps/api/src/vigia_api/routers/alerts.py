@@ -11,10 +11,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 
 from vigia_api.core.db import get_sessionmaker
-from vigia_api.core.security import WorkspaceContext, require_active_plan
+from vigia_api.core.security import WorkspaceContext, current_workspace, require_active_plan
 from vigia_shared.constants import SECTORES
 from vigia_shared.models import Alerta, AlertaMatch, Norma
 
@@ -30,14 +30,12 @@ def _require_real_workspace(ctx: WorkspaceContext) -> None:
 
 
 def _clean_keywords(keywords: list[str]) -> list[str]:
-    """Normaliza la lista de keywords: strip, sin vacías, sin duplicados, ≥1."""
+    """Normaliza la lista de keywords: strip, sin vacías, sin duplicados (preserva orden)."""
     seen: list[str] = []
     for kw in keywords:
         kw = kw.strip()
         if kw and kw not in seen:
             seen.append(kw)
-    if not seen:
-        raise HTTPException(422, "keyword_required")
     return seen
 
 
@@ -52,8 +50,18 @@ def _clean_sectores(sectores: list[str]) -> list[str]:
     return seen
 
 
+def _require_criterio(keywords: list[str], sectores: list[str]) -> None:
+    """Una alerta necesita al menos un criterio: keywords O sectores.
+
+    Antes se exigía ≥1 keyword; ahora una alerta por-sector (keywords vacío,
+    sectores no vacío) es válida y monitorea todas las normas de esos sectores.
+    """
+    if not keywords and not sectores:
+        raise HTTPException(422, "criterio_vacio")
+
+
 class AlertaIn(BaseModel):
-    keywords: list[str]
+    keywords: list[str] = []
     sectores: list[str] = []
 
 
@@ -79,6 +87,22 @@ class MatchOut(BaseModel):
     titulo: str
     fecha_publicacion: Date | None
     matched_at: datetime
+
+
+class PreviewIn(BaseModel):
+    keywords: list[str] = []
+    sectores: list[str] = []
+
+
+class PreviewSample(BaseModel):
+    tipo: str
+    titulo: str
+    fecha_publicacion: Date | None
+
+
+class PreviewOut(BaseModel):
+    count_30d: int
+    sample: list[PreviewSample]
 
 
 @router.get("", response_model=list[AlertaOut])
@@ -112,6 +136,7 @@ async def create_alerta(
     _require_real_workspace(ctx)
     keywords = _clean_keywords(body.keywords)
     sectores = _clean_sectores(body.sectores)
+    _require_criterio(keywords, sectores)
     Session = get_sessionmaker()
     async with Session() as session:
         a = Alerta(
@@ -127,6 +152,58 @@ async def create_alerta(
     return AlertaOut(
         id=a.id, keywords=a.keywords, sectores=a.sectores, activa=a.activa,
         matches=0, last_match_at=None,
+    )
+
+
+@router.post("/preview", response_model=PreviewOut)
+async def preview_alerta(
+    body: PreviewIn,
+    ctx: Annotated[WorkspaceContext, Depends(current_workspace)],
+) -> PreviewOut:
+    """Estima cuántas normas matchearía un criterio (keywords + sectores).
+
+    Cuenta sobre los últimos 30 días de `norma` como proxy del volumen futuro
+    ("~N/mes"), usando la MISMA lógica que el matcher (OR de `plainto_tsquery`
+    español entre keywords, `sector = ANY` entre sectores) pero sin el filtro de
+    `anchor` ni el `NOT EXISTS`. Solo lectura: no exige plan activo (el gating de
+    creación de alertas vive en los otros endpoints)."""
+    keywords = _clean_keywords(body.keywords)
+    sectores = _clean_sectores(body.sectores)
+    _require_criterio(keywords, sectores)
+
+    params: dict = {}
+    where = ["n.fecha_publicacion >= (now() - interval '30 days')"]
+    if keywords:
+        ts_parts = []
+        for i, kw in enumerate(keywords):
+            ts_parts.append(f"plainto_tsquery('spanish', :kw{i})")
+            params[f"kw{i}"] = kw
+        where.append(f"n.search_vector @@ ({' || '.join(ts_parts)})")
+    if sectores:
+        where.append("n.sector = ANY(:sectores)")
+        params["sectores"] = sectores
+    where_sql = " AND ".join(where)
+
+    Session = get_sessionmaker()
+    async with Session() as session:
+        count = await session.scalar(
+            text(f"SELECT count(*) FROM norma n WHERE {where_sql}"), params
+        )
+        rows = (
+            await session.execute(
+                text(
+                    f"SELECT tipo, titulo, fecha_publicacion FROM norma n WHERE {where_sql} "
+                    "ORDER BY fecha_publicacion DESC NULLS LAST LIMIT 3"
+                ),
+                params,
+            )
+        ).all()
+    return PreviewOut(
+        count_30d=int(count or 0),
+        sample=[
+            PreviewSample(tipo=r.tipo, titulo=r.titulo, fecha_publicacion=r.fecha_publicacion)
+            for r in rows
+        ],
     )
 
 
@@ -163,6 +240,7 @@ async def update_alerta(
             a.activa = body.activa
 
         if criterio_cambio:
+            _require_criterio(a.keywords, a.sectores)
             a.anchor_at = func.now()
             a.last_match_at = None
             await session.execute(

@@ -53,15 +53,19 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
             for i, kw in enumerate(a.keywords or []):
                 ts_parts.append(f"plainto_tsquery('spanish', :kw{i})")
                 params[f"kw{i}"] = kw
-            if not ts_parts:  # alerta sin keywords → nada que matchear
-                continue
-            ts_expr = " || ".join(ts_parts)
 
             # OR entre sectores (lista vacía = cualquier sector).
             sector_clause = ""
             if a.sectores:
                 sector_clause = "AND n.sector = ANY(:sectores)"
                 params["sectores"] = a.sectores
+
+            # Una alerta necesita al menos un criterio. Con keywords → filtro FTS;
+            # sin keywords pero con sectores → alerta por-sector (matchea todas las
+            # normas del sector). Sin ninguno de los dos, nada que matchear.
+            if not ts_parts and not sector_clause:
+                continue
+            ts_clause = f"AND n.search_vector @@ ({' || '.join(ts_parts)})" if ts_parts else ""
 
             inserted = (
                 await session.execute(
@@ -70,9 +74,9 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                         INSERT INTO alerta_match (alerta_id, norma_id, notified)
                         SELECT :aid, n.id, false
                         FROM norma n
-                        WHERE n.search_vector @@ ({ts_expr})
+                        WHERE n.ingested_at >= :anchor
+                          {ts_clause}
                           {sector_clause}
-                          AND n.ingested_at >= :anchor
                           AND NOT EXISTS (
                               SELECT 1 FROM alerta_match m
                               WHERE m.alerta_id = :aid AND m.norma_id = n.id
@@ -101,7 +105,9 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                         {"ids": norma_ids},
                     )
                 ).all()
-                kw_label = ", ".join(a.keywords or [])
+                kw_label = ", ".join(a.keywords or []) or (
+                    "sectores: " + ", ".join(a.sectores or [])
+                )
                 _, items = digests[a.user_email]
                 digests[a.user_email] = (
                     a.ws_name,
