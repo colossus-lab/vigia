@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
-import TrialGate from '@/components/TrialGate';
 import OnboardingBanner from '@/components/OnboardingBanner';
 import OnboardingGate from '@/components/OnboardingGate';
 
@@ -13,7 +12,6 @@ export default function AppLayout({ children }) {
   return (
     <div className="min-h-screen flex flex-col">
       <OnboardingGate />
-      <TrialGate />
       <div className="flag-stripe fixed top-0 inset-x-0 z-[60]" />
       <div className="flex flex-1">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
