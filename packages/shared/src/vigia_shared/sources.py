@@ -41,7 +41,12 @@ SOURCES: dict[str, dict] = {
         "kind": "scrape",
         "base_url": "https://www.senado.gob.ar",
         "cadence_hours": 24,
-        "freshness_slo_days": 10,
+        # Sin SLO de frescura: el Senado tiene recesos largos (invierno ~3-4
+        # semanas y verano Dic-Feb sin sesiones, ~3 meses) durante los cuales no
+        # da cuenta a proyectos nuevos. Un SLO por MAX(fecha) sería ruido
+        # permanente. Las señales reales (corrida en error, beat caído) se
+        # mantienen vía last_status y cadence_hours.
+        "freshness_slo_days": None,
     },
     "bora_primera": {
         "code": "bora_primera",

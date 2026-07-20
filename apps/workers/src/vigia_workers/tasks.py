@@ -224,7 +224,7 @@ def _senado_to_row(p: SenadoProyecto) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_senado_proyectos")
-def ingest_senado_proyectos(dry_run: bool = False, max_pages: int = 3) -> dict[str, Any]:
+def ingest_senado_proyectos(dry_run: bool = False, max_pages: int = 3, notify: bool = True) -> dict[str, Any]:
     """Ingesta proyectos recientes originados en el Senado (scrape del buscador HSN).
 
     Solo origen=S (los venidos de Diputados ya están en hcdn_proyectos). Upsert

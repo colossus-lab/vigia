@@ -185,11 +185,19 @@ class SenadoClient:
         return parse_listado(r.text)
 
     async def fetch_detalle(self, p: SenadoProyecto) -> None:
-        async with self._sem:
-            r = await self._client.get(p.url)
-        info = parse_detalle(r.text)
-        p.fecha = info["fecha"]
-        p.autores = info["autores"]
+        # Un detalle flaky (el sitio del Senado es lento/inestable desde el EC2 y
+        # los timeouts httpx llegan sin mensaje) NO debe abortar toda la ingesta:
+        # el proyecto entra igual con fecha/autores nulos y un run posterior los
+        # completa (upsert idempotente). Antes, un solo timeout en el asyncio.gather
+        # tumbaba la corrida entera y la marcaba 'error' con mensaje vacío.
+        try:
+            async with self._sem:
+                r = await self._client.get(p.url)
+            info = parse_detalle(r.text)
+            p.fecha = info["fecha"]
+            p.autores = info["autores"]
+        except Exception:
+            return
 
     async def fetch_recientes(
         self,
