@@ -127,15 +127,10 @@ async def current_workspace(
 async def require_active_plan(
     ctx: Annotated[WorkspaceContext, Depends(current_workspace)],
 ) -> WorkspaceContext:
-    """Dependency: 402 si el free trial del workspace venció (plan free + 30 días).
+    """Dependency: exige sesión autenticada + membresía del workspace.
 
-    La membresía se otorga manualmente (plan != "free") escribiendo a
-    devops@colossuslab.org. No aplica en modo demo ni al accept de invitaciones
-    (que debe funcionar para unirse a un workspace con membresía).
+    La plataforma es gratuita: ya no se gatea por free trial (antes devolvía 402
+    trial_expired a los 30 días). Se mantiene como punto único de gating por si
+    vuelve a hacer falta; hoy es equivalente a `current_workspace`.
     """
-    if ctx.trial_expired:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="trial_expired",
-        )
     return ctx
