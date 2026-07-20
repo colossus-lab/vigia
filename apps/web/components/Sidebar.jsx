@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Newspaper, BarChart3, Search, Bell, Shield, X, Eye, Landmark, Building2 } from 'lucide-react';
+import { Newspaper, BarChart3, Search, Bell, Shield, X, Eye, Landmark, Building2, Heart } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/feed', label: 'Feed Normativo', icon: Newspaper },
@@ -64,6 +64,22 @@ export default function Sidebar({ open, onClose }) {
             );
           })}
         </nav>
+
+        {/* Apoyar */}
+        <div className="px-3 pb-2">
+          <Link
+            href="/apoyar"
+            onClick={onClose}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium border transition-colors ${
+              pathname === '/apoyar' || pathname.startsWith('/apoyar/')
+                ? 'bg-sol/10 text-sol border-sol/30'
+                : 'text-text-secondary border-transparent hover:bg-sol/5 hover:text-sol hover:border-sol/20'
+            }`}
+          >
+            <Heart size={16} className="shrink-0" />
+            <span>Apoyar a Vigía</span>
+          </Link>
+        </div>
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-border-light">

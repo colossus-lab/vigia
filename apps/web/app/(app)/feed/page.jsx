@@ -12,6 +12,7 @@ import {
 import FadeIn from '@/components/FadeIn';
 import CountUp from '@/components/CountUp';
 import { Edicion } from '@/components/Edicion';
+import SupportBanner from '@/components/SupportBanner';
 
 // Icono por organismo emisor (lucide). Fallback a Building2.
 const EMISOR_ICON = {
@@ -119,6 +120,7 @@ function FeedView() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      <SupportBanner />
       <FadeIn>
         <div className="mb-7 pt-2">
           <p className="eyebrow mb-1"><span className="eyebrow-num">VIGÍA / FEED</span><span className="ml-2">Lo último publicado</span></p>
