@@ -114,16 +114,92 @@ function BarrasH({ items, color }) {
 
 export async function GET(_req, ctx) {
   const { chart } = await ctx.params;
-  const [displayBold, mono] = await Promise.all([
+  const [displayBold, displayItalic, mono] = await Promise.all([
     loadFont('familjen-grotesk@latest/latin-700-normal.ttf'),
+    loadFont('familjen-grotesk@latest/latin-700-italic.ttf'),
     loadFont('jetbrains-mono@latest/latin-500-normal.ttf'),
   ]);
   const fonts = [
     { name: 'Familjen Grotesk', data: displayBold, weight: 700, style: 'normal' },
+    { name: 'Familjen Grotesk', data: displayItalic, weight: 700, style: 'italic' },
     { name: 'JetBrains Mono', data: mono, weight: 500, style: 'normal' },
   ];
 
   let node;
+
+  if (chart === 'hero') {
+    // Cabecera del email: es la única forma de que el mail lleve la tipografía
+    // real de Vigía (los clientes de correo no cargan webfonts).
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: BG,
+            backgroundImage:
+              'radial-gradient(ellipse 820px 520px at 8% -20%, rgba(246,180,14,0.14), transparent 62%), radial-gradient(ellipse 700px 480px at 105% 120%, rgba(116,172,223,0.12), transparent 58%)',
+          }}
+        >
+          <div style={{ display: 'flex', height: 8, width: '100%' }}>
+            <div style={{ flex: 1, backgroundColor: CELESTE }} />
+            <div style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
+            <div style={{ flex: 1, backgroundColor: CELESTE }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '46px 56px 52px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 12,
+                  border: `2px solid rgba(116,172,223,0.45)`,
+                  backgroundColor: 'rgba(116,172,223,0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={CELESTE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontFamily: 'Familjen Grotesk', fontWeight: 700, fontSize: 26, color: TX, letterSpacing: 2 }}>VIGÍA</span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, letterSpacing: 4, color: TX3, marginTop: 2 }}>POR OPENARG</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', fontFamily: 'JetBrains Mono', fontSize: 17, letterSpacing: 5, color: SOL, marginBottom: 18 }}>
+                TU COLABORACIÓN
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  fontFamily: 'Familjen Grotesk',
+                  fontWeight: 700,
+                  fontSize: 58,
+                  lineHeight: 1.08,
+                  letterSpacing: -2,
+                  color: TX,
+                }}
+              >
+                <span>Nos alegra que le estés</span>
+                <span>dando uso a <span style={{ fontStyle: 'italic', color: SOL }}>Vigía.</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      { width: 1200, height: 620, fonts }
+    );
+  }
 
   if (chart === 'sectores') {
     const d = await (await fetch(`${API}/stats/dashboard`, { next: { revalidate } })).json();
