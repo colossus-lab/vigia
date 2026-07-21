@@ -68,7 +68,8 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **Orden de beats importa**: `ingest_hcdn_proyectos` (08:00) pisa `norma.estado` a diario; `ingest_hcdn_movimientos` (08:30) lo re-deriva. No invertirlos.
 - **Fuentes nuevas**: runbook en `infra/DEPLOY.md` (dry-run → backfill → `match_alertas(notify=False)` → beat). Registry con SLOs en `vigia_shared/sources.py`; estado operativo sin ssh en `GET /health/sources`.
 - **BORA 2ª NO entra a `norma`**: va a `aviso_societario` (tabla y FTS propios, router `/avisos`, página "Radar societario") para no contaminar feed/stats/alertas.
-- **Free trial**: 30 días por workspace (`Workspace.created_at` + `VIGIA_TRIAL_DAYS`); al vencer, 402 `trial_expired` en endpoints gated + cartel inamovible en el web. Membresía manual: `UPDATE workspace SET plan='member'` (runbook en DEPLOY.md).
+- **Plataforma gratuita, sin trial** (desde 2026-07-20): se eliminó el gating por free trial — `require_active_plan` ya no devuelve 402 `trial_expired` (solo exige sesión + membresía) y no hay cartel en el web. Los campos `trial_ends_at`/`VIGIA_TRIAL_DAYS` quedan inertes. **No reintroducir gating por plan/trial sin pedido explícito.** La monetización es aporte voluntario: sección pública `/apoyar` (links de Mercado Pago de la Fundación Colossus Lab + CBU), con `/apoyar/gracias` como back URL de MP.
+- **Alertas por-sector**: una alerta es válida con `keywords` **O** `sectores` (422 `criterio_vacio` solo si ambos vacíos). Sin keywords, el matcher filtra solo por `sector = ANY(...)` — sin el filtro FTS. `POST /alerts/preview` estima el volumen (normas de los últimos 30 días) reusando esa misma lógica.
 
 ## Diseño / UX
 
