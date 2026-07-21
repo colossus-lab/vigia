@@ -37,7 +37,8 @@ const SECCIONES = [
     num: 'IV.',
     titulo: 'Para qué los usamos',
     cuerpo: [
-      <>Para que el servicio funcione: autenticarte, mantener tu workspace y mandarte los emails que pediste — el digest de tus alertas y las invitaciones que enviás. Son emails operativos, no de marketing.</>,
+      <>Para que el servicio funcione: autenticarte, mantener tu workspace y mandarte los emails que pediste — el digest de tus alertas y las invitaciones que enviás. Son emails operativos.</>,
+      <>Ocasionalmente podemos escribirte para contarte <strong className="text-text-primary">novedades relevantes del servicio</strong>: cambios en cómo funciona, funciones nuevas o avisos importantes. Son pocos y podés <strong className="text-text-primary">darte de baja</strong> con un clic desde el pie de esos emails, sin perder los avisos de tus alertas. Nunca usamos tu email para publicidad ni lo cedemos a terceros.</>,
     ],
   },
   {
@@ -77,7 +78,7 @@ const SECCIONES = [
     cuerpo: [
       <>Vigía está en <strong className="text-text-primary">beta</strong> y se ofrece "tal cual". Hacemos lo posible por la frescura y fidelidad de los datos (monitoreamos cada fuente con SLOs), pero las fuentes oficiales pueden contener errores, demoras u omisiones — y nuestro procesamiento también puede fallar.</>,
       <>Vigía <strong className="text-text-primary">no es asesoramiento legal</strong>. Los resúmenes — incluidos los generados automáticamente con IA — son orientativos: ante cualquier decisión, verificá siempre el texto completo en la fuente oficial (cada norma incluye el link).</>,
-      <>Cada workspace incluye un período de prueba gratuito de 30 días; al vencer, las funciones de cuenta (workspaces y alertas) requieren membresía. Los datos normativos públicos siguen siendo de libre acceso.</>,
+      <>Vigía es <strong className="text-text-primary">gratuito</strong>: no hay período de prueba ni funciones pagas. Se sostiene con aportes voluntarios (ver <Link href="/apoyar" className="textlink">Apoyar</Link>), que no destraban nada — todas las funciones están disponibles para todos, y los datos normativos públicos son de libre acceso.</>,
     ],
   },
   {
@@ -154,7 +155,7 @@ export default function LegalPage() {
 
         <FadeIn>
           <p className="text-[10px] text-text-tertiary font-mono pt-6">
-            Última actualización: 15 de junio de 2026 · Fundación Colossus Lab · Buenos Aires
+            Última actualización: 20 de julio de 2026 · Fundación Colossus Lab · Buenos Aires
           </p>
         </FadeIn>
       </main>
