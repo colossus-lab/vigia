@@ -149,7 +149,7 @@ export async function GET(_req, ctx) {
             <div style={{ flex: 1, backgroundColor: CELESTE }} />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '46px 56px 52px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '40px 56px 44px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div
                 style={{
@@ -191,13 +191,13 @@ export async function GET(_req, ctx) {
                 }}
               >
                 <span>Nos alegra que le estés</span>
-                <span>dando uso a <span style={{ fontStyle: 'italic', color: SOL }}>Vigía.</span></span>
+                <span>dando uso a{' '}<span style={{ fontStyle: 'italic', color: SOL }}>Vigía.</span></span>
               </div>
             </div>
           </div>
         </div>
       ),
-      { width: 1200, height: 620, fonts }
+      { width: 1200, height: 470, fonts }
     );
   }
 
