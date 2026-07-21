@@ -2,16 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Eye, Copy, Check, ArrowLeft, Clock } from 'lucide-react';
+import { Eye, Copy, Check, ArrowLeft, ExternalLink } from 'lucide-react';
 import FadeIn from '@/components/FadeIn';
 
 const CBU = '0070011520000022781626';
 const CBU_PRETTY = '0070 0115 2000 0022 7816 26';
 
 const TIERS = [
-  { k: 'Adherente', amt: '$3.000', cad: 'Aporte único' },
-  { k: 'Colaborador/a', amt: '$5.000', sub: '/ mes', cad: 'Aporte mensual', feat: true },
-  { k: 'Patrocinador/a', amt: '$20.000', cad: 'Aporte único mayor' },
+  { k: 'Adherente', amt: '$3.000', cad: 'Aporte único', cta: 'Aportar', url: 'https://mpago.la/2Ak5Rqr' },
+  { k: 'Colaborador/a', amt: '$5.000', sub: '/ mes', cad: 'Débito automático mensual', cta: 'Suscribirme', url: 'https://mpago.la/258XizR', feat: true },
+  { k: 'Patrocinador/a', amt: '$20.000', cad: 'Aporte único mayor', cta: 'Aportar', url: 'https://mpago.la/156hs6A' },
 ];
 
 export default function ApoyarPage() {
@@ -73,23 +73,29 @@ export default function ApoyarPage() {
                   {t.amt}{t.sub && <span className="text-[0.85rem] text-text-tertiary"> {t.sub}</span>}
                 </span>
                 <span className="text-[12px] text-text-secondary mb-3">{t.cad}</span>
-                <span className="mt-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-medium border border-border-light text-text-tertiary cursor-default">
-                  <Clock size={12} /> MercadoPago · próximamente
-                </span>
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`mt-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold transition-colors ${
+                    t.feat
+                      ? 'btn-celeste'
+                      : 'border border-border-light text-text-primary hover:border-celeste hover:bg-celeste/5'
+                  }`}
+                >
+                  {t.cta} <ExternalLink size={12} />
+                </a>
               </div>
             ))}
           </div>
           <p className="text-[11px] text-text-tertiary font-mono mb-9">
-            Los aportes por MercadoPago (único y suscripción mensual) se habilitan pronto. Por ahora, aportá por transferencia 👇
+            Pagás con tarjeta de crédito, débito o efectivo. No hace falta tener cuenta de Mercado Pago.
           </p>
         </FadeIn>
 
         <FadeIn delay={160}>
           <div className="card p-6 mb-8">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-semibold uppercase tracking-wide tint-green border px-1.5 py-0.5 rounded-full">Disponible ahora</span>
-            </div>
-            <h2 className="text-[17px] font-bold text-text-primary mb-1 mt-2" style={{ fontFamily: 'var(--font-display)' }}>Aportá por transferencia</h2>
+            <h2 className="text-[17px] font-bold text-text-primary mb-1" style={{ fontFamily: 'var(--font-display)' }}>¿Preferís transferir?</h2>
             <p className="text-[13px] text-text-secondary mb-1">Transferí el monto que quieras desde cualquier banco o billetera.</p>
 
             <div className="mt-4 mb-4">
