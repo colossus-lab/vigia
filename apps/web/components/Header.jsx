@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Menu, Bell } from 'lucide-react';
+import Link from 'next/link';
+import { Menu, Bell, Heart } from 'lucide-react';
 import AuthButton from '@/components/AuthButton';
 
 export default function Header({ onMenuToggle }) {
@@ -34,9 +35,16 @@ export default function Header({ onMenuToggle }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-[10px] font-medium border tint-green px-2.5 py-1 rounded-full">
+          <span className="hidden md:inline-block text-[10px] font-medium border tint-green px-2.5 py-1 rounded-full">
             ● Datos reales · InfoLEG / Boletín Oficial
           </span>
+          <Link
+            href="/apoyar"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sol/10 text-sol border border-sol/30 hover:bg-sol/20 transition-colors whitespace-nowrap"
+          >
+            <Heart size={13} />
+            <span className="hidden sm:inline">Apoyar</span>
+          </Link>
           <button className="relative p-1.5 rounded text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors">
             <Bell size={16} />
             <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-status-red" />

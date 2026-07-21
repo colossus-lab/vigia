@@ -63,23 +63,23 @@ export default function Sidebar({ open, onClose }) {
               </Link>
             );
           })}
+          {/* Apoyar — dentro de la navegación (no en el pie) y separado de las
+              secciones de datos, para que se vea sin scrollear. */}
+          <div className="pt-2 mt-2 border-t border-border-light">
+            <Link
+              href="/apoyar"
+              onClick={onClose}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-bold border transition-colors ${
+                pathname === '/apoyar' || pathname.startsWith('/apoyar/')
+                  ? 'bg-sol/15 text-sol border-sol/40'
+                  : 'bg-sol/[0.07] text-sol border-sol/25 hover:bg-sol/15 hover:border-sol/40'
+              }`}
+            >
+              <Heart size={16} className="shrink-0" />
+              <span>Apoyar a Vigía</span>
+            </Link>
+          </div>
         </nav>
-
-        {/* Apoyar */}
-        <div className="px-3 pb-2">
-          <Link
-            href="/apoyar"
-            onClick={onClose}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium border transition-colors ${
-              pathname === '/apoyar' || pathname.startsWith('/apoyar/')
-                ? 'bg-sol/10 text-sol border-sol/30'
-                : 'text-text-secondary border-transparent hover:bg-sol/5 hover:text-sol hover:border-sol/20'
-            }`}
-          >
-            <Heart size={16} className="shrink-0" />
-            <span>Apoyar a Vigía</span>
-          </Link>
-        </div>
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-border-light">
