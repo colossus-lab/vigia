@@ -8,11 +8,14 @@ import FadeIn from '@/components/FadeIn';
 const CBU = '0070011520000022781626';
 const CBU_PRETTY = '0070 0115 2000 0022 7816 26';
 
+/* Los tres niveles son suscripciones mensuales (débito automático en MP).
+   El monto libre lo define el donante en el checkout. */
 const TIERS = [
-  { k: 'Adherente', amt: '$3.000', cad: 'Aporte único', cta: 'Aportar', url: 'https://mpago.la/2Ak5Rqr' },
-  { k: 'Colaborador/a', amt: '$5.000', sub: '/ mes', cad: 'Débito automático mensual', cta: 'Suscribirme', url: 'https://mpago.la/258XizR', feat: true },
-  { k: 'Patrocinador/a', amt: '$20.000', cad: 'Aporte único mayor', cta: 'Aportar', url: 'https://mpago.la/156hs6A' },
+  { k: 'Adherente', amt: '$3.000', url: 'https://mpago.la/2vLd7UV' },
+  { k: 'Colaborador/a', amt: '$5.000', url: 'https://mpago.la/258XizR', feat: true },
+  { k: 'Patrocinador/a', amt: '$20.000', url: 'https://mpago.la/2V9fVHo' },
 ];
+const MONTO_LIBRE_URL = 'https://mpago.la/15TqeBQ';
 
 export default function ApoyarPage() {
   const [copied, setCopied] = useState(false);
@@ -70,9 +73,9 @@ export default function ApoyarPage() {
               >
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-tertiary">{t.k}</span>
                 <span className="font-mono text-[1.9rem] font-medium text-text-primary leading-tight">
-                  {t.amt}{t.sub && <span className="text-[0.85rem] text-text-tertiary"> {t.sub}</span>}
+                  {t.amt}<span className="text-[0.85rem] text-text-tertiary"> / mes</span>
                 </span>
-                <span className="text-[12px] text-text-secondary mb-3">{t.cad}</span>
+                <span className="text-[12px] text-text-secondary mb-3">Débito automático mensual</span>
                 <a
                   href={t.url}
                   target="_blank"
@@ -83,20 +86,36 @@ export default function ApoyarPage() {
                       : 'border border-border-light text-text-primary hover:border-celeste hover:bg-celeste/5'
                   }`}
                 >
-                  {t.cta} <ExternalLink size={12} />
+                  Suscribirme <ExternalLink size={12} />
                 </a>
               </div>
             ))}
           </div>
+          {/* Monto libre — misma suscripción mensual, pero el importe lo elige el donante */}
+          <a
+            href={MONTO_LIBRE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-celeste/40 bg-celeste/[0.04] px-5 py-4 mb-4 hover:bg-celeste/[0.09] hover:border-celeste/60 transition-colors"
+          >
+            <span className="min-w-0">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-text-tertiary mb-0.5">El monto que quieras</span>
+              <span className="block text-[13px] text-text-secondary">Elegís vos cuánto aportar por mes.</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold border border-celeste/40 text-celeste-bright whitespace-nowrap">
+              Elegir monto <ExternalLink size={12} />
+            </span>
+          </a>
+
           <p className="text-[11px] text-text-tertiary font-mono mb-9">
-            Pagás con tarjeta de crédito, débito o efectivo. No hace falta tener cuenta de Mercado Pago.
+            Se debita automáticamente todos los meses con tu tarjeta. Podés cancelarla cuando quieras desde Mercado Pago.
           </p>
         </FadeIn>
 
         <FadeIn delay={160}>
           <div className="card p-6 mb-8">
-            <h2 className="text-[17px] font-bold text-text-primary mb-1" style={{ fontFamily: 'var(--font-display)' }}>¿Preferís transferir?</h2>
-            <p className="text-[13px] text-text-secondary mb-1">Transferí el monto que quieras desde cualquier banco o billetera.</p>
+            <h2 className="text-[17px] font-bold text-text-primary mb-1" style={{ fontFamily: 'var(--font-display)' }}>¿Preferís un aporte único?</h2>
+            <p className="text-[13px] text-text-secondary mb-1">Transferí el monto que quieras, una sola vez o cuando puedas, desde cualquier banco o billetera.</p>
 
             <div className="mt-4 mb-4">
               <p className="text-[14px] font-semibold text-text-primary" style={{ fontFamily: 'var(--font-display)' }}>Fundación Colossus Lab</p>
