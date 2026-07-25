@@ -19,6 +19,11 @@ vigia-api.openarg.org {
 		# No filtrar el stack del upstream.
 		-Server
 	}
-	reverse_proxy api:8000
+	# OJO: apuntar al NOMBRE DE CONTENEDOR, no al de servicio. Licitar corre en
+	# el mismo EC2 y se une a `vigia_default` con un servicio también llamado
+	# `api` (ver ../Licitar/docker-compose.prod.yml), así que el DNS de Docker
+	# resuelve `api` a DOS IPs y hace round-robin: ~50% de las requests de Vigía
+	# las contestaba la API de Licitar (404 en /normas, /stats, /search, /avisos).
+	reverse_proxy vigia-api-1:8000
 	encode gzip
 }
