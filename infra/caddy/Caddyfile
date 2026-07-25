@@ -27,3 +27,13 @@ vigia-api.openarg.org {
 	reverse_proxy vigia-api-1:8000
 	encode gzip
 }
+
+# Licitar (proyecto hermano, repo privado) comparte este EC2 y este Caddy: su
+# compose se une a `vigia_default` y no levanta proxy propio. El bloque vive acá
+# —y no suelto en el servidor— porque un `git pull` en el EC2 lo borraba y
+# dejaba licitar-api.openarg.org sin ruteo, en silencio, en cada deploy.
+# El dominio ya es público de todos modos: Let's Encrypt publica cada
+# certificado en los logs de Certificate Transparency.
+licitar-api.openarg.org {
+	reverse_proxy licitar-api-1:8000
+}
