@@ -11,6 +11,8 @@ import os
 
 import httpx
 
+from vigia_shared.emails_html import esc
+
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 ALERTS_FROM_EMAIL = os.environ.get("ALERTS_FROM_EMAIL", "Vigía <alertas@openarg.org>")
 WEB_BASE_URL = os.environ.get("WEB_BASE_URL", "https://vigia.openarg.org").rstrip("/")
@@ -24,23 +26,26 @@ def invite_accept_url(token: str) -> str:
 def render_invitation(
     workspace_name: str, role: str, accept_url: str, invited_by: str | None = None
 ) -> str:
-    inviter = f" por <strong>{invited_by}</strong>" if invited_by else ""
+    # TODO lo interpolado va escapado: `workspace_name` e `invited_by` los elige
+    # el usuario, y el mail sale firmado con el DKIM de openarg.org.
+    inviter = f" por <strong>{esc(invited_by)}</strong>" if invited_by else ""
+    url = esc(accept_url)
     return (
         f'<div style="font-family:Inter,system-ui,sans-serif;background:#06090F;color:#E8ECF4;'
         f'padding:32px 24px;border-radius:12px;max-width:600px">'
         f'<p style="margin:0 0 4px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#636E85">'
         f"VIGÍA / INVITACIÓN</p>"
         f'<h2 style="margin:0 0 10px;font-size:20px;color:#E8ECF4">Te invitaron a '
-        f'<em style="color:#F6B40E;font-style:italic">{workspace_name}</em></h2>'
+        f'<em style="color:#F6B40E;font-style:italic">{esc(workspace_name)}</em></h2>'
         f'<p style="margin:0 0 22px;font-size:13px;color:#8892A8;line-height:1.6">'
-        f"Fuiste invitado{inviter} a sumarte como <strong>{role}</strong> al workspace "
-        f"<strong>{workspace_name}</strong> en Vigía, la plataforma de inteligencia "
+        f"Fuiste invitado{inviter} a sumarte como <strong>{esc(role)}</strong> al workspace "
+        f"<strong>{esc(workspace_name)}</strong> en Vigía, la plataforma de inteligencia "
         f"legislativa y regulatoria argentina.</p>"
-        f'<a href="{accept_url}" style="display:inline-block;background:#74ACDF;color:#06090F;'
+        f'<a href="{url}" style="display:inline-block;background:#74ACDF;color:#06090F;'
         f'font-weight:700;font-size:14px;padding:10px 22px;border-radius:999px;text-decoration:none">'
         f"Aceptar invitación</a>"
         f'<p style="margin:18px 0 0;font-size:11px;color:#636E85">Si el botón no funciona, '
-        f'abrí este link: <a href="{accept_url}" style="color:#74ACDF">{accept_url}</a></p>'
+        f'abrí este link: <a href="{url}" style="color:#74ACDF">{url}</a></p>'
         f'<p style="margin:14px 0 0;color:#636E85;font-size:11px">Inteligencia legislativa · Colossus Lab</p>'
         f"</div>"
     )
