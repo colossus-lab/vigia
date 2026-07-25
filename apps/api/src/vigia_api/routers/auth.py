@@ -64,6 +64,13 @@ def _require_internal_secret(authorization: str | None, settings: Settings) -> N
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_internal_token")
     token = authorization.split(" ", 1)[1].strip()
+    # Rechazo explícito del par vacío: `compare_digest("", "")` es True, así que
+    # un `Authorization: Bearer ` pelado contra un secreto vacío pasaría la
+    # validación y /auth/sync mintea un JWT para CUALQUIER email. El validador de
+    # arranque ya impide el secreto vacío con auth prendida; esto es el segundo
+    # cerrojo, para que la condición no dependa de una sola comprobación.
+    if not token or not settings.auth_secret:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid_internal_token")
     if not secrets.compare_digest(token, settings.auth_secret):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid_internal_token")
 

@@ -46,10 +46,16 @@ _CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=600"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Con vigia_docs=False (default) los tres endpoints quedan en 404: FastAPI no
+    # registra las rutas cuando las URLs son None. Ver Settings.vigia_docs.
+    docs = settings.vigia_docs
     app = FastAPI(
         title="Vigía API",
         version="0.1.0",
         description="Backend de Vigía — inteligencia legislativa y regulatoria argentina.",
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
     app.add_middleware(
         CORSMiddleware,

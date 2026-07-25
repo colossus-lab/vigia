@@ -60,6 +60,15 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **Compose prod**: `environment:` pisa `env_file:` y `${VAR}` se interpola desde `.env` (no desde env_file) → en el EC2 existe `.env` como copia de `.env.production`. No borrarla.
 - **`search_vector`** es columna GENERATED (tsvector spanish, migración 0001) — no escribirla desde el ORM.
 - **Windows**: `aws.exe` emite la key SSH con CRLF (rompe libcrypto — limpiar con `tr -d '\r'`); Git Bash convierte `/dev/...` en paths Windows (usar `MSYS_NO_PATHCONV=1`); el venv usa Python 3.14.
+- **`/docs`, `/redoc` y `/openapi.json` están CERRADOS por default** (404). Se
+  prenden solo con `VIGIA_DOCS=true`, que se setea en dev y nunca en producción:
+  publicaban el mapa completo de la API. Si la variable falta, quedan cerrados —
+  el lado seguro del error. Ojo: diagnosticar la API leyendo `/openapi.json` ya
+  no funciona contra prod.
+- **`AUTH_SECRET` con `AUTH_ENABLED=true` aborta el arranque** si está vacío, es
+  un placeholder conocido (`dev-only-change-me`, que vive en este repo público) o
+  mide menos de 32 caracteres. Preferimos que la API no levante antes que firmar
+  JWT con un secreto que cualquiera puede leer en GitHub.
 - **Auth**: `AUTH_ENABLED=false` (default) = modo demo público. Los endpoints de datos son públicos SIEMPRE; el gating aplica solo a `/workspaces`, `/invitations`, `/alerts`. El JWT lo firma la API en `/auth/sync` (server-to-server con `AUTH_SECRET`).
 - **NextAuth v5-beta + Next 16**: known issue con `headers()` async al activar OAuth real — puede requerir bump de next-auth (documentado en `../investarg`).
 - **Preview/screenshots en dev**: el cliente next-auth + TypingDemo impiden el "network idle" — verificar por DOM (`preview_eval`) en vez de screenshot.
