@@ -67,6 +67,12 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                 continue
             ts_clause = f"AND n.search_vector @@ ({' || '.join(ts_parts)})" if ts_parts else ""
 
+            # El NOT EXISTS filtra el caso común, pero es un chequeá-y-después-
+            # insertá: entre el SELECT y el INSERT otra corrida puede meter la
+            # misma fila y esta revienta con UniqueViolation, abortando el
+            # matcheo de esa hora (pasó 4 veces en 7 días). El ON CONFLICT cierra
+            # la ventana. `RETURNING` sigue devolviendo SOLO las filas realmente
+            # insertadas, así que las que pierden la carrera no re-notifican.
             inserted = (
                 await session.execute(
                     text(
@@ -81,6 +87,7 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                               SELECT 1 FROM alerta_match m
                               WHERE m.alerta_id = :aid AND m.norma_id = n.id
                           )
+                        ON CONFLICT ON CONSTRAINT uq_match_alerta_norma DO NOTHING
                         RETURNING norma_id
                         """
                     ),
