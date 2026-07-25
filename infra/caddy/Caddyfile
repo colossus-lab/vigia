@@ -34,6 +34,14 @@ vigia-api.openarg.org {
 # dejaba licitar-api.openarg.org sin ruteo, en silencio, en cada deploy.
 # El dominio ya es público de todos modos: Let's Encrypt publica cada
 # certificado en los logs de Certificate Transparency.
+#
+# El upstream es el ALIAS DE RED `licitar-api`, declarado explícitamente en el
+# compose de Licitar. No es el nombre del servicio ni el del contenedor a
+# propósito: así Licitar puede renombrar lo que quiera sin romper este ruteo.
+# Requiere que su servicio tenga:
+#     networks:
+#       vigia_default:
+#         aliases: [licitar-api]
 licitar-api.openarg.org {
-	reverse_proxy licitar-api-1:8000
+	reverse_proxy licitar-api:8000
 }
