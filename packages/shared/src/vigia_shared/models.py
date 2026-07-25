@@ -32,6 +32,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -70,6 +71,10 @@ class Norma(Base):
     __table_args__ = (
         UniqueConstraint("source_id", "external_id", name="uq_norma_source_external"),
         Index("ix_norma_fecha", "fecha_publicacion"),
+        # Calca el ORDER BY del feed (fecha DESC NULLS LAST, id DESC). Sin él,
+        # `ix_norma_fecha` no sirve (es ASC y la columna es nullable) y cada
+        # request ordena la tabla entera. Ver migración 0008.
+        Index("ix_norma_feed", text("fecha_publicacion DESC NULLS LAST, id DESC")),
         Index("ix_norma_tipo_sector", "tipo", "sector"),
         Index("ix_norma_emisor", "emisor"),
         Index("ix_norma_impacto", "impacto"),

@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
+from vigia_api.core.cache import cached
 from vigia_api.core.db import get_sessionmaker
 from vigia_shared.models import DnuTracking, Norma, SourceCatalog
 from vigia_shared.relevancia import PESO_TIPO, es_tramite
@@ -14,6 +15,10 @@ router = APIRouter(prefix="/normas", tags=["normas"])
 # Topes por edición (el cliente muestra lo que llega; el resto queda contado).
 _MAX_DESTACADOS = 30
 _MAX_TRAMITE = 80
+
+# TTL del COUNT del feed. La ingesta es diaria: el total puede atrasarse unos
+# minutos sin que se note en un contador de medio millón.
+_COUNT_TTL = 300.0
 
 
 def _apply_source(filters: list, source: str | None) -> None:
@@ -141,9 +146,16 @@ async def list_normas(
     _apply_source(filters, source)
 
     async with Session() as session:
-        total = (
-            await session.execute(select(func.count()).select_from(Norma).where(*filters))
-        ).scalar_one()
+        # El COUNT sin filtros es un seq scan de las ~543k filas (~1,5 s) y solo
+        # alimenta el contador de paginación: lo cacheamos por combinación de
+        # filtros. La query de items, en cambio, sale del índice ix_norma_feed.
+        async def _count() -> int:
+            return (
+                await session.execute(select(func.count()).select_from(Norma).where(*filters))
+            ).scalar_one()
+
+        cache_key = f"normas:count:{tipo}|{impacto}|{sector}|{emisor}|{source}"
+        total = await cached(cache_key, _COUNT_TTL, _count)
         query = (
             select(Norma)
             .where(*filters)

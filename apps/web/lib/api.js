@@ -10,8 +10,16 @@ function qs(params) {
   return s ? `?${s}` : '';
 }
 
-async function get(path) {
-  const res = await fetch(`${BASE}${path}`, { cache: 'no-store' });
+// Los datos de Vigía cambian una vez por día (ingesta 03:00/08:00 ART), así que
+// no tiene sentido pegarle a la API en cada navegación.
+//
+// `next.revalidate` solo aplica cuando el fetch corre en el server de Next; casi
+// todas las páginas que usan este cliente son 'use client', así que ahí lo
+// ignora y manda el `Cache-Control` que devuelve la API (ver main.py).
+const REVALIDATE_SECONDS = 120;
+
+async function get(path, { revalidate = REVALIDATE_SECONDS } = {}) {
+  const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
   if (!res.ok) throw new Error(`API ${res.status} en ${path}`);
   return res.json();
 }
