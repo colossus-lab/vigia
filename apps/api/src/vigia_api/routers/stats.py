@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from sqlalchemy import text
 
+from vigia_api.core.cache import cached
 from vigia_api.core.db import get_sessionmaker
 from vigia_shared.schemas import (
     DashboardStats,
@@ -19,9 +20,24 @@ from vigia_shared.schemas import (
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
+# La ingesta corre una vez por día (beat 03:00/08:00 ART), así que 5' de
+# desactualización en los KPIs es invisible y ahorra el scan en cada visita.
+_DASHBOARD_TTL = 300.0
+
 
 @router.get("/dashboard", response_model=DashboardStats)
 async def dashboard() -> DashboardStats:
+    """KPIs globales. Cacheado: son tres seq scans de la tabla entera.
+
+    `COUNT(*)` y los dos `GROUP BY` recorren las ~543k filas sí o sí (no hay
+    índice que evite un agregado global), ~4,5 s en total. Como la ingesta es
+    diaria, servir un valor de hasta `_DASHBOARD_TTL` segundos de antigüedad no
+    cambia nada de lo que se muestra.
+    """
+    return await cached("stats:dashboard", _DASHBOARD_TTL, _dashboard_uncached)
+
+
+async def _dashboard_uncached() -> DashboardStats:
     Session = get_sessionmaker()
     async with Session() as session:
         total = (await session.execute(text("SELECT COUNT(*) FROM norma"))).scalar_one()

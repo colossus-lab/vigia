@@ -37,6 +37,13 @@ if _sentry_dsn:
         print(f"[sentry] init failed: {exc!r}")
 
 
+# Prefijos de datos públicos (CLAUDE.md: los endpoints de datos son públicos
+# SIEMPRE; el gating aplica solo a /workspaces, /invitations, /alerts, /account).
+# Solo estos llevan Cache-Control: nada con sesión se cachea.
+_CACHEABLE_PREFIXES = ("/normas", "/stats", "/avisos", "/search")
+_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=600"
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
@@ -51,6 +58,24 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    @app.middleware("http")
+    async def cache_public_reads(request, call_next):
+        """Deja que el browser reuse las lecturas públicas por un rato.
+
+        Las páginas del web son 'use client', así que pegan directo contra la
+        API: sin este header cada navegación re-consulta todo. Se limita a GET
+        200 sin Authorization para no cachear jamás una respuesta con sesión.
+        """
+        response = await call_next(request)
+        if (
+            request.method == "GET"
+            and response.status_code == 200
+            and "authorization" not in request.headers
+            and request.url.path.startswith(_CACHEABLE_PREFIXES)
+        ):
+            response.headers["Cache-Control"] = _CACHE_CONTROL
+        return response
+
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(workspaces.router)
