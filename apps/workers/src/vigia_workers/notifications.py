@@ -5,15 +5,14 @@ repo. Dominio `openarg.org` verificado en Resend (DKIM/SPF en Route53).
 """
 from __future__ import annotations
 
-import html
 import os
 
 import httpx
 
-
-def _esc(value) -> str:
-    """Escapa texto controlable por usuario/terceros antes de interpolarlo en HTML."""
-    return html.escape(str(value)) if value is not None else ""
+# El escapador vive en vigia_shared para que la API y los workers usen el mismo:
+# esta función existía solo acá, y el módulo de mail de la API —que nació como
+# fork de este— quedó sin ella durante meses.
+from vigia_shared.emails_html import esc as _esc
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 ALERTS_FROM_EMAIL = os.environ.get("ALERTS_FROM_EMAIL", "Vigía <alertas@openarg.org>")
