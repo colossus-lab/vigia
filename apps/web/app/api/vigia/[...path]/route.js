@@ -14,7 +14,11 @@
 import { getToken } from 'next-auth/jwt';
 
 const API_BASE = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+// TIENE que ser el mismo secreto con el que NextAuth cifra la cookie de sesión
+// (`secret:` en auth.js, que lee esta misma env var). Si divergen, getToken()
+// devuelve null en silencio, el BFF reenvía sin bearer y TODOS los usuarios
+// logueados empiezan a comer 401 sin que nada falle de forma visible.
+const AUTH_SECRET = process.env.AUTH_SECRET;
 
 // Solo lo que el web realmente usa. Quedan afuera a propósito
 // `/workspaces/me/leave` y `/alerts/{id}/matches`: ninguna pantalla los llama.
