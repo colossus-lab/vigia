@@ -69,6 +69,23 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   un placeholder conocido (`dev-only-change-me`, que vive en este repo público) o
   mide menos de 32 caracteres. Preferimos que la API no levante antes que firmar
   JWT con un secreto que cualquiera puede leer en GitHub.
+- **El JWT de la API NO llega al browser**: el web pega a los endpoints gateados
+  vía el BFF `apps/web/app/api/vigia/[...path]/route.js`, que descifra la cookie
+  de NextAuth con `getToken()` e inyecta el bearer **server-side**. `authedFetch`
+  recibe `(path, init)` — sin token. Para sumar un endpoint hay que agregarlo a
+  la **allowlist** del handler: no es un proxy genérico a propósito (un rewrite
+  `:path*` ya se removió una vez por dejar un proxy abierto en Vercel). El
+  secreto del handler tiene que ser el mismo `AUTH_SECRET` que usa `auth.js`, o
+  `getToken()` devuelve null en silencio y todos comen 401.
+- **Rate limiting** (`apps/api/src/vigia_api/core/ratelimit.py`): en memoria, va
+  como *dependency* y no como middleware — registrado después de `CORSMiddleware`
+  quedaría por fuera y los 429 saldrían sin headers CORS. Solo mutaciones y
+  endpoints caros; los GET públicos **no** se limitan porque el SSR de Vercel
+  llega desde pocas IPs y las estrangularía. En `/auth/sync` se limitan **fallos**
+  y no intentos, por el mismo motivo. Se apaga con `RATELIMIT_ENABLED=false`.
+  Caddy no sirve para esto: la imagen stock no trae módulo de rate limit.
+- **Escritura en el workspace exige rol** `owner|admin` (`require_escritura`).
+  `require_active_plan` NO valida rol — no usarla para endpoints que escriben.
 - **Auth**: `AUTH_ENABLED=false` (default) = modo demo público. Los endpoints de datos son públicos SIEMPRE; el gating aplica solo a `/workspaces`, `/invitations`, `/alerts`. El JWT lo firma la API en `/auth/sync` (server-to-server con `AUTH_SECRET`).
 - **NextAuth v5-beta + Next 16**: known issue con `headers()` async al activar OAuth real — puede requerir bump de next-auth (documentado en `../investarg`).
 - **Preview/screenshots en dev**: el cliente next-auth + TypingDemo impiden el "network idle" — verificar por DOM (`preview_eval`) en vez de screenshot.
