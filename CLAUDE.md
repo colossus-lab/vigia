@@ -77,6 +77,19 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   `:path*` ya se removió una vez por dejar un proxy abierto en Vercel). El
   secreto del handler tiene que ser el mismo `AUTH_SECRET` que usa `auth.js`, o
   `getToken()` devuelve null en silencio y todos comen 401.
+- **`getToken()` necesita `secureCookie`** — esto ya rompió producción una vez.
+  Su default es `false`, y de ahí salen el nombre de cookie que busca
+  (`authjs.session-token`) **y** el salt con que la descifra. En HTTPS la cookie
+  es `__Secure-authjs.session-token`: sin el flag no la encuentra ni podría
+  abrirla, y devuelve null **sin error**. El handler lo deduce de las cookies que
+  llegan. Regresión: `pnpm test:bff` en `apps/web` — cifra una cookie con la
+  criptografía real, sin browser ni sesión de Google.
+- **Un cambio que toque la sesión no se prueba sin loguearse.** Build, tests y
+  render pasan igual con el BFF roto. Va por rama → preview de Vercel → probar
+  con sesión real → recién ahí a `main`. Ojo: en la preview **no cargan las
+  normativas**, porque el browser las pide directo a la API y su origen no está
+  en `API_CORS_ORIGINS`. Eso es esperable y no es un bug: lo que pasa por el BFF
+  es same-origin y sí funciona.
 - **Rate limiting** (`apps/api/src/vigia_api/core/ratelimit.py`): en memoria, va
   como *dependency* y no como middleware — registrado después de `CORSMiddleware`
   quedaría por fuera y los 429 saldrían sin headers CORS. Solo mutaciones y
