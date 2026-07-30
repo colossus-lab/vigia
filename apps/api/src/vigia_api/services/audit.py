@@ -7,6 +7,10 @@ from fastapi import Request
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Fuente única de verdad para la IP del cliente, compartida con el rate limiter.
+# Antes esta lógica estaba duplicada acá; tenerla en dos lugares significaba que
+# el audit log y los límites pudieran discrepar sobre quién hizo qué.
+from vigia_api.core.ratelimit import client_ip as _client_ip
 from vigia_shared.models import AuditLog
 
 ACTION_LOGIN = "auth.login"
@@ -17,13 +21,6 @@ ACTION_MEMBER_REMOVED = "member.removed"
 ACTION_ONBOARDED = "workspace.onboarded"
 
 
-def _client_ip(request: Request | None) -> str | None:
-    if request is None:
-        return None
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()[:64]
-    return request.client.host[:64] if request.client else None
 
 
 def _user_agent(request: Request | None) -> str | None:

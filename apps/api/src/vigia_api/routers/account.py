@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_, select
 
 from vigia_api.core.db import get_sessionmaker
+from vigia_api.core.ratelimit import limitar_por_usuario
 from vigia_api.core.security import WorkspaceContext, current_workspace
 from vigia_shared.models import (
     Alerta,
@@ -28,6 +29,10 @@ from vigia_shared.models import (
 )
 
 router = APIRouter(prefix="/account", tags=["account"])
+
+# Borrar la cuenta dispara cascadas caras (workspaces, alertas, audit log) y es
+# irreversible. Nadie lo hace tres veces por hora de buena fe.
+_limite_borrado = limitar_por_usuario("account_delete", limite=3, ventana=60 * 60)
 
 
 @router.get("/export")
@@ -142,7 +147,7 @@ async def export_account(
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
-    ctx: Annotated[WorkspaceContext, Depends(current_workspace)],
+    ctx: Annotated[WorkspaceContext, Depends(_limite_borrado)],
 ) -> None:
     """Derecho de supresión: borra la cuenta y todos sus datos.
 

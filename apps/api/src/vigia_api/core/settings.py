@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # variable falta, quedan cerrados — que es el lado seguro del error.
     vigia_docs: bool = False
 
+    # Rate limiting de los endpoints que mutan o son caros (ver core/ratelimit).
+    # Se puede apagar por env var sin redeploy si alguna cuota resulta molesta en
+    # producción; el default es prendido.
+    ratelimit_enabled: bool = True
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]

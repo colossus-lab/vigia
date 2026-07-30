@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select, text, update
 
 from vigia_api.core.db import get_sessionmaker
+from vigia_api.core.ratelimit import limitar_por_workspace
 from vigia_api.core.security import (
     WorkspaceContext,
     current_workspace,
@@ -24,6 +25,12 @@ from vigia_shared.constants import SECTORES
 from vigia_shared.models import Alerta, AlertaMatch, Norma
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
+
+# `/alerts/preview` corre full-text sobre `norma` (un COUNT + un SELECT con
+# ORDER BY) sin cache y sin tope de keywords. Con 10 conexiones en el pool
+# (core/db.py) una ráfaga lo satura antes que a la CPU. 30/min por workspace es
+# holgado para tipear un criterio y probarlo, y corta el abuso.
+_limite_preview = limitar_por_workspace("alerts_preview", limite=30, ventana=60)
 
 
 def _require_real_workspace(ctx: WorkspaceContext) -> None:
@@ -163,7 +170,7 @@ async def create_alerta(
 @router.post("/preview", response_model=PreviewOut)
 async def preview_alerta(
     body: PreviewIn,
-    ctx: Annotated[WorkspaceContext, Depends(current_workspace)],
+    ctx: Annotated[WorkspaceContext, Depends(_limite_preview)],
 ) -> PreviewOut:
     """Estima cuántas normas matchearía un criterio (keywords + sectores).
 

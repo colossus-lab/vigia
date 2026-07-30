@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, select
 
 from vigia_api.core.db import get_sessionmaker
+from vigia_api.core.ratelimit import limitar_por_workspace
 from vigia_api.core.security import (
     WorkspaceContext,
     current_workspace,
@@ -27,6 +28,14 @@ from vigia_shared.constants import ROL_ADMIN, ROL_OWNER, ROL_VIEWER
 from vigia_shared.models import AppUser, Workspace, WorkspaceInvitation, WorkspaceMember
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+
+# Cada invitación dispara un mail vía Resend firmado con el DKIM de openarg.org:
+# el abuso acá no cuesta CPU, cuesta reputación de dominio. El cupo de asientos
+# ya acota el total, pero no el ritmo — 20/día por workspace cubre de sobra armar
+# un equipo y frena a quien quiera usarnos de relay.
+_limite_invitaciones = limitar_por_workspace(
+    "invitaciones", limite=20, ventana=24 * 60 * 60
+)
 
 INVITE_TTL_DAYS = 14
 
@@ -138,7 +147,14 @@ async def members(ctx: Annotated[WorkspaceContext, Depends(require_active_plan)]
     ]
 
 
-@router.post("/me/invitations", response_model=InviteOut)
+@router.post(
+    "/me/invitations",
+    response_model=InviteOut,
+    # Va como dependency extra y no anidada en `ctx` para no perder el chequeo de
+    # rol. FastAPI cachea `current_workspace` dentro del request, así que las dos
+    # dependencies comparten el mismo contexto sin reconsultar la base.
+    dependencies=[Depends(_limite_invitaciones)],
+)
 async def create_invitation(
     body: InviteBody,
     request: Request,

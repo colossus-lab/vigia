@@ -17,12 +17,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vigia_api.core.db import get_sessionmaker
+from vigia_api.core.ratelimit import client_ip, consultar, rechazar, registrar
 from vigia_api.core.security import sign_jwt, trial_ends_at_for
 from vigia_api.core.settings import Settings, get_settings
 from vigia_api.services.audit import ACTION_LOGIN, write_audit_event
 from vigia_shared.models import AppUser, Workspace, WorkspaceMember
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Fuerza bruta del AUTH_SECRET: 10 fallos por IP en 15 minutos. El secreto de
+# producción tiene 64 caracteres, así que esto no lo hace inviable — ya lo era —
+# pero corta el ruido y deja rastro antes de que alguien lo intente en serio.
+_MAX_FALLOS = 10
+_VENTANA_FALLOS = 15 * 60
 
 
 class SyncRequest(BaseModel):
@@ -60,9 +67,31 @@ async def _unique_slug(session: AsyncSession, base: str) -> str:
     return f"{base}-{secrets.token_hex(4)}"
 
 
-def _require_internal_secret(authorization: str | None, settings: Settings) -> None:
+def _require_internal_secret(
+    authorization: str | None, settings: Settings, request: Request | None = None
+) -> None:
+    """Valida el secreto del canal interno web→API, con freno a la fuerza bruta.
+
+    Se limitan los FALLOS, no los intentos, y eso es deliberado: `/auth/sync` lo
+    llama el server de Next en cada login, así que TODO el tráfico legítimo llega
+    desde el puñado de IPs de Vercel. Un límite por intentos las estrangularía a
+    todas y rompería el login en cualquier pico. Limitando fallos, quien acierta
+    el secreto nunca se frena y quien lo adivina a ciegas se queda afuera.
+    """
+    ip = client_ip(request) or "desconocida"
+    clave = f"auth_sync_fallos:ip:{ip}"
+    if settings.ratelimit_enabled:
+        espera = consultar(clave, _MAX_FALLOS, _VENTANA_FALLOS)
+        if espera is not None:
+            raise rechazar(espera, "too_many_failed_attempts")
+
+    def _fallo(detalle: str, code: int) -> HTTPException:
+        if settings.ratelimit_enabled:
+            registrar(clave, _VENTANA_FALLOS)
+        return HTTPException(status_code=code, detail=detalle)
+
     if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_internal_token")
+        raise _fallo("missing_internal_token", status.HTTP_401_UNAUTHORIZED)
     token = authorization.split(" ", 1)[1].strip()
     # Rechazo explícito del par vacío: `compare_digest("", "")` es True, así que
     # un `Authorization: Bearer ` pelado contra un secreto vacío pasaría la
@@ -70,9 +99,9 @@ def _require_internal_secret(authorization: str | None, settings: Settings) -> N
     # arranque ya impide el secreto vacío con auth prendida; esto es el segundo
     # cerrojo, para que la condición no dependa de una sola comprobación.
     if not token or not settings.auth_secret:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid_internal_token")
+        raise _fallo("invalid_internal_token", status.HTTP_403_FORBIDDEN)
     if not secrets.compare_digest(token, settings.auth_secret):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid_internal_token")
+        raise _fallo("invalid_internal_token", status.HTTP_403_FORBIDDEN)
 
 
 @router.post("/sync", response_model=SyncResponse)
@@ -82,7 +111,7 @@ async def sync_user(
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     settings: Annotated[Settings, Depends(get_settings)] = None,  # type: ignore[assignment]
 ) -> SyncResponse:
-    _require_internal_secret(authorization, settings)
+    _require_internal_secret(authorization, settings, request)
 
     Session = get_sessionmaker()
     async with Session() as session:
