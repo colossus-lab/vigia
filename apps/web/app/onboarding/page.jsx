@@ -32,7 +32,7 @@ export default function OnboardingPage() {
   const submit = async () => {
     setSaving(true);
     try {
-      await authedFetch('/workspaces/me/onboarding', {
+      await authedFetch(session?.apiJwt, '/workspaces/me/onboarding', {
         method: 'POST',
         body: JSON.stringify({ name: name || undefined, sectores_interes: selected }),
       });
@@ -43,7 +43,7 @@ export default function OnboardingPage() {
       // volumen esperado (preview) antes de crearla con un clic.
       setStep('suggest');
       try {
-        const p = await authedFetch('/alerts/preview', {
+        const p = await authedFetch(session?.apiJwt, '/alerts/preview', {
           method: 'POST',
           body: JSON.stringify({ keywords: [], sectores: selected }),
         });
@@ -57,7 +57,7 @@ export default function OnboardingPage() {
   const createAlerta = async () => {
     setCreating(true);
     try {
-      await authedFetch('/alerts', {
+      await authedFetch(session?.apiJwt, '/alerts', {
         method: 'POST',
         body: JSON.stringify({ keywords: [], sectores: selected }),
       });

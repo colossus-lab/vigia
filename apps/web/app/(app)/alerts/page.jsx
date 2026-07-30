@@ -107,10 +107,8 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
 
 export default function AlertsView() {
   const { data: session } = useSession();
-  // Antes esto miraba `session.apiJwt`. El token ya no llega al browser (lo
-  // inyecta el BFF server-side), así que la señal de "hay sesión usable" pasa a
-  // ser el workspace, que es lo que /auth/sync devuelve al loguearse.
-  const connected = AUTH_ENABLED && Boolean(session?.workspace?.id);
+  const jwt = session?.apiJwt;
+  const connected = AUTH_ENABLED && Boolean(jwt);
 
   const [alertas, setAlertas] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -120,14 +118,14 @@ export default function AlertsView() {
   const load = useCallback(async () => {
     if (!connected) return;
     try {
-      setAlertas(await authedFetch('/alerts'));
+      setAlertas(await authedFetch(jwt, '/alerts'));
     } catch (e) { setErr(String(e.message || e)); }
-  }, [connected]);
+  }, [connected, jwt]);
 
   // Preview de volumen para el form (solo con sesión: el endpoint pide auth).
   const previewAlerta = useCallback(
-    (payload) => authedFetch('/alerts/preview', { method: 'POST', body: JSON.stringify(payload) }),
-    [],
+    (payload) => authedFetch(jwt, '/alerts/preview', { method: 'POST', body: JSON.stringify(payload) }),
+    [jwt],
   );
   const onPreview = connected ? previewAlerta : null;
 
@@ -136,7 +134,7 @@ export default function AlertsView() {
   const addAlerta = async ({ keywords, sectores }) => {
     if (connected) {
       try {
-        await authedFetch('/alerts', { method: 'POST', body: JSON.stringify({ keywords, sectores }) });
+        await authedFetch(jwt, '/alerts', { method: 'POST', body: JSON.stringify({ keywords, sectores }) });
         await load();
       } catch (e) { setErr(String(e.message || e)); }
     } else {
@@ -151,7 +149,7 @@ export default function AlertsView() {
   const saveEdit = async (a, { keywords, sectores }) => {
     if (connected) {
       try {
-        await authedFetch(`/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ keywords, sectores }) });
+        await authedFetch(jwt, `/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ keywords, sectores }) });
         await load();
       } catch (e) { setErr(String(e.message || e)); }
     } else {
@@ -162,7 +160,7 @@ export default function AlertsView() {
 
   const toggleAlerta = async (a) => {
     if (connected) {
-      await authedFetch(`/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ activa: !a.activa }) });
+      await authedFetch(jwt, `/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ activa: !a.activa }) });
       load();
     } else {
       setAlertas((prev) => prev.map((x) => (x.id === a.id ? { ...x, activa: !x.activa } : x)));
@@ -171,7 +169,7 @@ export default function AlertsView() {
 
   const deleteAlerta = async (a) => {
     if (connected) {
-      await authedFetch(`/alerts/${a.id}`, { method: 'DELETE' });
+      await authedFetch(jwt, `/alerts/${a.id}`, { method: 'DELETE' });
       load();
     } else {
       setAlertas((prev) => prev.filter((x) => x.id !== a.id));
