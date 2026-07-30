@@ -6,7 +6,11 @@ import Google from 'next-auth/providers/google';
  *
  * Flujo: signIn('google') → callback jwt hace POST {API}/auth/sync con AUTH_SECRET
  * → la API upserta app_user, garantiza workspace default y devuelve un JWT propio
- * → guardamos apiJwt + workspace en el token y lo exponemos en la session.
+ * → guardamos apiJwt + workspace en el token (la cookie cifrada).
+ *
+ * El apiJwt NO se expone en la session: quien lo usa es el BFF, server-side
+ * (app/api/vigia/[...path]/route.js). En la session solo va `workspace`, que es
+ * metadata que la UI necesita mostrar.
  *
  * Si no hay credenciales Google, AUTH_ENABLED=false y la app corre en modo demo
  * (datos públicos sin login).
@@ -111,7 +115,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      session.apiJwt = token.apiJwt;
+      // El apiJwt NO se expone acá a propósito. Todo lo que devuelve este
+      // callback se serializa en GET /api/auth/session, así que ponerlo mandaba
+      // el bearer al browser y cualquier XSS se llevaba un token válido 24h y
+      // no revocable. Sigue viviendo en `token` (la cookie cifrada) porque el
+      // callback `jwt` de arriba lo necesita para renovarlo; quien lo usa para
+      // pegarle a la API es el BFF, server-side: app/api/vigia/[...path]/route.js
       if (token.workspaceId) {
         session.workspace = {
           id: token.workspaceId,
