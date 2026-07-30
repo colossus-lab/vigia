@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Users, Plus, Trash2, Copy, Building2, Info, MessageCircle, Check, Mail, Download, ShieldAlert, AlertTriangle } from 'lucide-react';
-import { authedFetch, AUTH_ENABLED } from '@/lib/authClient';
-import { API_BASE } from '@/lib/api';
+import { authedFetch, AUTH_ENABLED, BFF_BASE } from '@/lib/authClient';
 
 function inviteMessage(wsName, token) {
   const link = `${location.origin}/auth/invite?token=${token}`;
@@ -13,7 +12,6 @@ function inviteMessage(wsName, token) {
 
 export default function WorkspaceSettings() {
   const { data: session, status } = useSession();
-  const jwt = session?.apiJwt;
   const [ws, setWs] = useState(null);
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
@@ -29,23 +27,25 @@ export default function WorkspaceSettings() {
   const userEmail = session?.user?.email || '';
 
   const load = useCallback(async () => {
-    if (!jwt) return;
+    // El token ya no está en la sesión (lo inyecta el BFF server-side): la señal
+    // de sesión usable pasa a ser el workspace que devuelve /auth/sync.
+    if (!session?.workspace?.id) return;
     try {
       const [w, m, i] = await Promise.all([
-        authedFetch(jwt, '/workspaces/me'),
-        authedFetch(jwt, '/workspaces/me/members'),
-        authedFetch(jwt, '/workspaces/me/invitations'),
+        authedFetch('/workspaces/me'),
+        authedFetch('/workspaces/me/members'),
+        authedFetch('/workspaces/me/invitations'),
       ]);
       setWs(w); setMembers(m); setInvites(i);
     } catch (e) { setErr(String(e.message || e)); }
-  }, [jwt]);
+  }, [session?.workspace?.id]);
 
   useEffect(() => { load(); }, [load]);
 
   const invite = async () => {
     setErr('');
     try {
-      const inv = await authedFetch(jwt, '/workspaces/me/invitations', {
+      const inv = await authedFetch('/workspaces/me/invitations', {
         method: 'POST', body: JSON.stringify({ email, role }),
       });
       setLastInvite(inv);
@@ -64,16 +64,18 @@ export default function WorkspaceSettings() {
     `https://wa.me/?text=${encodeURIComponent(inviteMessage(ws?.name || 'mi workspace', token))}`;
 
   const removeMember = async (userId) => {
-    try { await authedFetch(jwt, `/workspaces/me/members/${userId}`, { method: 'DELETE' }); load(); }
+    try { await authedFetch(`/workspaces/me/members/${userId}`, { method: 'DELETE' }); load(); }
     catch (e) { setErr(String(e.message || e)); }
   };
 
   const exportData = async () => {
     setErr(''); setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/account/export`, {
-        headers: { Authorization: `Bearer ${jwt}` }, cache: 'no-store',
-      });
+      // Va por el BFF como todo lo demás, pero con fetch crudo y no
+      // `authedFetch` porque esto baja un archivo: hay que leer el blob, no
+      // parsear JSON. El route handler streamea el body y preserva el
+      // Content-Disposition del upstream.
+      const res = await fetch(`${BFF_BASE}/account/export`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`API ${res.status} en /account/export`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -88,7 +90,7 @@ export default function WorkspaceSettings() {
   const deleteAccount = async () => {
     setErr(''); setBusy(true);
     try {
-      await authedFetch(jwt, '/account', { method: 'DELETE' });
+      await authedFetch('/account', { method: 'DELETE' });
       await signOut({ callbackUrl: '/' });
     } catch (e) { setErr(String(e.message || e)); setBusy(false); }
   };

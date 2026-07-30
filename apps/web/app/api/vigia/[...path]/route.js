@@ -1,0 +1,97 @@
+// BFF: inyecta el bearer de la API del lado del SERVIDOR.
+//
+// Antes el JWT de la API viajaba al browser (`session.apiJwt` en auth.js) y los
+// componentes armaban el header a mano. Como todo lo que devuelve el callback
+// `session` se serializa en GET /api/auth/session, cualquier XSS se llevaba un
+// token válido por 24h y no revocable. Ahora el token vive solo en la cookie
+// cifrada de NextAuth y se descifra acá, en el server.
+//
+// OJO — esto NO puede ser un proxy genérico. El commit 0876d34 ya removió un
+// rewrite `/api-proxy/:path*` justamente porque dejaba un proxy abierto en
+// Vercel: cualquiera lo usaba para pegarle a lo que quisiera desde nuestro
+// origen. Por eso cada request se valida contra una ALLOWLIST explícita de
+// (método, patrón) y la URL base sale de env, nunca del input.
+import { getToken } from 'next-auth/jwt';
+
+const API_BASE = (process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
+// Solo lo que el web realmente usa. Quedan afuera a propósito
+// `/workspaces/me/leave` y `/alerts/{id}/matches`: ninguna pantalla los llama.
+// Los `\d+` y `[\w-]+` acotan los parámetros dinámicos: sin eso, `/alerts/..%2f..`
+// sería un camino para salirse del prefijo.
+const ALLOWLIST = [
+  ['GET', /^\/alerts$/],
+  ['POST', /^\/alerts$/],
+  ['POST', /^\/alerts\/preview$/],
+  ['PATCH', /^\/alerts\/\d+$/],
+  ['DELETE', /^\/alerts\/\d+$/],
+  ['GET', /^\/workspaces\/me$/],
+  ['POST', /^\/workspaces\/me\/onboarding$/],
+  ['GET', /^\/workspaces\/me\/members$/],
+  ['GET', /^\/workspaces\/me\/invitations$/],
+  ['POST', /^\/workspaces\/me\/invitations$/],
+  ['DELETE', /^\/workspaces\/me\/members\/\d+$/],
+  ['GET', /^\/account\/export$/],
+  ['DELETE', /^\/account$/],
+  ['POST', /^\/invitations\/[\w-]+\/accept$/],
+];
+
+function permitido(metodo, ruta) {
+  return ALLOWLIST.some(([m, re]) => m === metodo && re.test(ruta));
+}
+
+// Headers de la respuesta de la API que sí queremos reenviar. El export de datos
+// baja como archivo, así que sin Content-Disposition la descarga pierde el
+// nombre. Todo lo demás se descarta (no filtramos el stack del upstream).
+const HEADERS_A_REENVIAR = ['content-type', 'content-disposition', 'content-length'];
+
+async function manejar(request, ctx) {
+  const { path = [] } = await ctx.params;
+  const ruta = '/' + path.join('/');
+  const metodo = request.method.toUpperCase();
+
+  if (!permitido(metodo, ruta)) {
+    return Response.json({ detail: 'not_allowed' }, { status: 404 });
+  }
+
+  const headers = new Headers();
+  const ct = request.headers.get('content-type');
+  if (ct) headers.set('content-type', ct);
+
+  // El token sale de la cookie cifrada, no de la sesión serializada. Si no hay
+  // —modo demo con AUTH_ENABLED=false— se reenvía sin bearer y la API responde
+  // con su contexto ficticio, igual que antes.
+  const token = AUTH_SECRET
+    ? await getToken({ req: request, secret: AUTH_SECRET })
+    : null;
+  if (token?.apiJwt) headers.set('authorization', `Bearer ${token.apiJwt}`);
+
+  const url = new URL(API_BASE + ruta);
+  url.search = new URL(request.url).search;
+
+  const body = ['GET', 'HEAD'].includes(metodo) ? undefined : await request.arrayBuffer();
+
+  let upstream;
+  try {
+    upstream = await fetch(url, { method: metodo, headers, body, cache: 'no-store' });
+  } catch {
+    return Response.json({ detail: 'upstream_unreachable' }, { status: 502 });
+  }
+
+  const salida = new Headers();
+  for (const h of HEADERS_A_REENVIAR) {
+    const v = upstream.headers.get(h);
+    if (v) salida.set(h, v);
+  }
+  // Se streamea el body en vez de leerlo: /account/export baja un archivo y
+  // materializarlo en memoria rompería con exports grandes.
+  return new Response(upstream.body, { status: upstream.status, headers: salida });
+}
+
+export const GET = manejar;
+export const POST = manejar;
+export const PATCH = manejar;
+export const DELETE = manejar;
+
+export const dynamic = 'force-dynamic';
