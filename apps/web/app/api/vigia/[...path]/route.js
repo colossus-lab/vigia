@@ -66,10 +66,38 @@ async function manejar(request, ctx) {
   // El token sale de la cookie cifrada, no de la sesión serializada. Si no hay
   // —modo demo con AUTH_ENABLED=false— se reenvía sin bearer y la API responde
   // con su contexto ficticio, igual que antes.
+  //
+  // `secureCookie` es OBLIGATORIO acá y su ausencia fue el bug de la v1 de esto.
+  // getToken() lo asume `false`, y de ese default salen DOS cosas: el nombre de
+  // cookie que busca (`authjs.session-token`) y —porque el salt por defecto ES el
+  // nombre de la cookie— la clave con la que la descifra. En HTTPS la cookie se
+  // llama `__Secure-authjs.session-token`, así que sin esto no la encuentra, y
+  // aunque la encontrara tampoco podría abrirla. Devuelve null EN SILENCIO: el
+  // BFF reenviaba sin bearer y todo lo autenticado daba 401 sin un solo error.
+  //
+  // Se deduce de las cookies que llegan y no del entorno: así vale igual en
+  // local (http), en las previews y en producción, sin variables que sincronizar.
+  const cookies = request.cookies.getAll();
+  const secureCookie = cookies.some((c) => c.name.startsWith('__Secure-authjs.session-token'));
+  const hayCookieDeSesion =
+    secureCookie || cookies.some((c) => c.name.startsWith('authjs.session-token'));
+
   const token = AUTH_SECRET
-    ? await getToken({ req: request, secret: AUTH_SECRET })
+    ? await getToken({ req: request, secret: AUTH_SECRET, secureCookie })
     : null;
-  if (token?.apiJwt) headers.set('authorization', `Bearer ${token.apiJwt}`);
+
+  if (token?.apiJwt) {
+    headers.set('authorization', `Bearer ${token.apiJwt}`);
+  } else if (hayCookieDeSesion) {
+    // Había sesión y no pudimos leer el token: es un bug de configuración, no un
+    // usuario anónimo. Sin este log el fallo es invisible — la API contesta 401
+    // y parece un problema de permisos. Nunca se loguean valores de cookies.
+    console.error(
+      '[bff] hay cookie de sesión pero getToken() no devolvió apiJwt — ' +
+        `secureCookie=${secureCookie}, secretoPresente=${Boolean(AUTH_SECRET)}, ` +
+        `cookies=[${cookies.map((c) => c.name).join(', ')}]`,
+    );
+  }
 
   const url = new URL(API_BASE + ruta);
   url.search = new URL(request.url).search;
