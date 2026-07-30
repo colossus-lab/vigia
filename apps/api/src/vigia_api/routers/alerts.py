@@ -14,7 +14,12 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select, text, update
 
 from vigia_api.core.db import get_sessionmaker
-from vigia_api.core.security import WorkspaceContext, current_workspace, require_active_plan
+from vigia_api.core.security import (
+    WorkspaceContext,
+    current_workspace,
+    require_active_plan,
+    require_escritura,
+)
 from vigia_shared.constants import SECTORES
 from vigia_shared.models import Alerta, AlertaMatch, Norma
 
@@ -131,7 +136,7 @@ async def list_alertas(ctx: Annotated[WorkspaceContext, Depends(require_active_p
 @router.post("", response_model=AlertaOut, status_code=201)
 async def create_alerta(
     body: AlertaIn,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> AlertaOut:
     _require_real_workspace(ctx)
     keywords = _clean_keywords(body.keywords)
@@ -211,7 +216,7 @@ async def preview_alerta(
 async def update_alerta(
     alerta_id: int,
     body: AlertaPatch,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> AlertaOut:
     """Edita una alerta. Solo aplica los campos provistos.
 
@@ -260,7 +265,7 @@ async def update_alerta(
 @router.delete("/{alerta_id}", status_code=204)
 async def delete_alerta(
     alerta_id: int,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> None:
     _require_real_workspace(ctx)
     Session = get_sessionmaker()

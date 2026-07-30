@@ -10,7 +10,12 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, select
 
 from vigia_api.core.db import get_sessionmaker
-from vigia_api.core.security import WorkspaceContext, current_workspace, require_active_plan
+from vigia_api.core.security import (
+    WorkspaceContext,
+    current_workspace,
+    require_active_plan,
+    require_escritura,
+)
 from vigia_api.services.audit import (
     ACTION_INVITE_CREATED,
     ACTION_MEMBER_LEFT,
@@ -18,6 +23,7 @@ from vigia_api.services.audit import (
     ACTION_ONBOARDED,
     write_audit_event,
 )
+from vigia_shared.constants import ROL_ADMIN, ROL_OWNER, ROL_VIEWER
 from vigia_shared.models import AppUser, Workspace, WorkspaceInvitation, WorkspaceMember
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -88,7 +94,7 @@ async def me(ctx: Annotated[WorkspaceContext, Depends(current_workspace)]) -> Wo
 async def onboarding(
     body: OnboardingBody,
     request: Request,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> WorkspaceMe:
     Session = get_sessionmaker()
     async with Session() as session:
@@ -136,20 +142,35 @@ async def members(ctx: Annotated[WorkspaceContext, Depends(require_active_plan)]
 async def create_invitation(
     body: InviteBody,
     request: Request,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> InviteOut:
-    if ctx.role not in ("owner", "admin"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "requires_owner_or_admin")
-    if body.role not in ("admin", "viewer"):
+    if body.role not in (ROL_ADMIN, ROL_VIEWER):
         raise HTTPException(422, "invalid_role")
+    # Solo el owner reparte poder: un admin que puede nombrar admins escala sin
+    # techo (invita a un cómplice, que invita a otro…). El admin invita viewers.
+    if body.role == ROL_ADMIN and ctx.role != ROL_OWNER:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "requires_owner_to_invite_admin")
 
     Session = get_sessionmaker()
     async with Session() as session:
+        # Cuenta miembros + invitaciones pendientes. Contando solo miembros, un
+        # workspace de 1 persona con seat_limit=5 podía emitir invitaciones
+        # ILIMITADAS a direcciones arbitrarias, y cada una manda un mail firmado
+        # con el DKIM de openarg.org. El cupo ahora acota el abuso por diseño.
         seats = await session.scalar(
             select(func.count()).select_from(WorkspaceMember).where(WorkspaceMember.workspace_id == ctx.workspace_id)
         )
+        pendientes = await session.scalar(
+            select(func.count())
+            .select_from(WorkspaceInvitation)
+            .where(
+                WorkspaceInvitation.workspace_id == ctx.workspace_id,
+                WorkspaceInvitation.accepted_at.is_(None),
+                WorkspaceInvitation.expires_at > datetime.now(timezone.utc),
+            )
+        )
         ws = await session.get(Workspace, ctx.workspace_id)
-        if int(seats or 0) >= ws.seat_limit:
+        if int(seats or 0) + int(pendientes or 0) >= ws.seat_limit:
             raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, "seat_limit_reached")
 
         token = secrets.token_urlsafe(24)
@@ -203,10 +224,8 @@ async def list_invitations(ctx: Annotated[WorkspaceContext, Depends(require_acti
 async def remove_member(
     user_id: int,
     request: Request,
-    ctx: Annotated[WorkspaceContext, Depends(require_active_plan)],
+    ctx: Annotated[WorkspaceContext, Depends(require_escritura)],
 ) -> None:
-    if ctx.role not in ("owner", "admin"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "requires_owner_or_admin")
     if user_id == ctx.user_id:
         raise HTTPException(422, "use_leave_endpoint")
     Session = get_sessionmaker()
@@ -218,6 +237,12 @@ async def remove_member(
         )
         if m is None:
             raise HTTPException(404, "member_not_found")
+        # Un admin no puede echar al dueño: si pudiera, dejaría el workspace sin
+        # owner y con el admin como única autoridad. Owner a owner sí se permite
+        # (los co-owners se auto-regulan), y `use_leave_endpoint` ya cubre el
+        # caso de irse uno mismo.
+        if m.role == ROL_OWNER and ctx.role != ROL_OWNER:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "requires_owner_to_remove_owner")
         await session.delete(m)
         await write_audit_event(
             session, action=ACTION_MEMBER_REMOVED, workspace_id=ctx.workspace_id, user_id=ctx.user_id,

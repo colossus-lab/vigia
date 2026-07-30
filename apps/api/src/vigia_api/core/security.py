@@ -17,6 +17,7 @@ from fastapi import Depends, Header, HTTPException, status
 
 from vigia_api.core.db import get_sessionmaker
 from vigia_api.core.settings import Settings, get_settings
+from vigia_shared.constants import ROLES_ESCRITURA
 from vigia_shared.models import Workspace, WorkspaceMember
 from sqlalchemy import select
 
@@ -132,5 +133,33 @@ async def require_active_plan(
     La plataforma es gratuita: ya no se gatea por free trial (antes devolvía 402
     trial_expired a los 30 días). Se mantiene como punto único de gating por si
     vuelve a hacer falta; hoy es equivalente a `current_workspace`.
+
+    OJO: NO valida rol. Para endpoints que escriben, usar `require_escritura`.
     """
     return ctx
+
+
+def require_role(*roles: str):
+    """Dependency factory: 403 si el rol del contexto no está en `roles`.
+
+    El rol sale de `WorkspaceContext`, que lo relee de la base en
+    `_load_workspace_context` — NO se confía del claim del JWT, así que un token
+    manipulado no escala privilegios.
+    """
+    permitidos = tuple(roles)
+    detalle = "requires_" + "_or_".join(permitidos)
+
+    async def _dep(
+        ctx: Annotated[WorkspaceContext, Depends(current_workspace)],
+    ) -> WorkspaceContext:
+        if ctx.role not in permitidos:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detalle)
+        return ctx
+
+    return _dep
+
+
+# Escritura sobre recursos del workspace: alertas y onboarding. El `viewer` lee
+# todo pero no modifica nada. El detalle del 403 queda `requires_owner_or_admin`,
+# igual que el que ya devolvían los chequeos inline de workspaces.py.
+require_escritura = require_role(*ROLES_ESCRITURA)

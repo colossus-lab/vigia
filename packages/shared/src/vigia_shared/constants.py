@@ -31,6 +31,18 @@ SECTORES: list[str] = [
 
 IMPACTOS: list[str] = ["alto", "medio", "bajo"]
 
+# Roles de membresía en un workspace. Hasta ahora solo existían como
+# CheckConstraint en la base (`ck_member_role`, `ck_invite_role`) y como strings
+# sueltos en los routers; centralizarlos evita que un typo pase silencioso.
+ROL_OWNER = "owner"
+ROL_ADMIN = "admin"
+ROL_VIEWER = "viewer"
+ROLES: tuple[str, ...] = (ROL_OWNER, ROL_ADMIN, ROL_VIEWER)
+
+# Quiénes pueden escribir en los recursos del workspace (alertas, onboarding).
+# El `viewer` lee todo pero no modifica nada.
+ROLES_ESCRITURA: tuple[str, ...] = (ROL_OWNER, ROL_ADMIN)
+
 # Estados de tramitación de PROYECTO derivados de los movimientos HCDN
 # (vigia_connectors.hcdn.derivar_estado). "En trámite" es el default al ingestar.
 ESTADOS_PROYECTO: list[str] = [
