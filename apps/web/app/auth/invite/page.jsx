@@ -18,9 +18,11 @@ function InviteInner() {
 
   useEffect(() => {
     if (!AUTH_ENABLED || !token) return;
-    if (status === 'authenticated' && session?.apiJwt && state === 'idle') {
+    // `status === 'authenticated'` alcanza: el bearer lo pone el BFF del lado del
+    // servidor, así que el browser ya no tiene con qué chequear el token.
+    if (status === 'authenticated' && state === 'idle') {
       setState('accepting');
-      authedFetch(session.apiJwt, `/invitations/${token}/accept`, { method: 'POST' })
+      authedFetch(`/invitations/${token}/accept`, { method: 'POST' })
         .then(() => { setState('ok'); setTimeout(() => router.push('/feed'), 1200); })
         .catch((e) => { setState('error'); setMsg(String(e.message || e)); });
     }
