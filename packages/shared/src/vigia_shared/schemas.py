@@ -90,6 +90,9 @@ class SeriesPoint(BaseModel):
 
 class OrganismoStat(BaseModel):
     organismo: str
+    # Parte de la identidad, no un adorno: hay un MINISTERIO DE SALUD nacional,
+    # uno de CABA y uno de PBA. Sin esto el ranking muestra tres filas iguales.
+    jurisdiccion: str | None = None
     cantidad: int
 
 

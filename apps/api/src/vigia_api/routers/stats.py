@@ -142,18 +142,40 @@ async def organismos(
     days: int = Query(90, ge=7, le=365),
     limit: int = Query(10, ge=3, le=30),
 ) -> list[OrganismoStat]:
-    """Top organismos emisores del período reciente (quién está regulando)."""
+    """Top organismos emisores del período reciente (quién está regulando).
+
+    Agrupa por (jurisdicción, nombre normalizado) y NO por el texto crudo. El
+    `organismo` viene como texto libre de cada fuente y la misma entidad llega
+    escrita distinto: `Jefatura de Gabinete de Ministros` y `JEFATURA DE GABINETE
+    DE MINISTROS` sumaban por separado — 32.175 normas partidas en dos. Había 14
+    grupos así, 44.479 normas, y el ranking los mostraba como organismos
+    distintos.
+
+    La jurisdicción va en la clave a propósito: el `MINISTERIO DE SALUD` nacional,
+    el de CABA y el de PBA son entidades distintas y NO deben fusionarse.
+
+    Se muestra la grafía más frecuente del grupo (`mode()`) en vez de la versión
+    en mayúsculas, que se lee como un grito.
+
+    La misma lógica vive en `vigia_shared.organismos.clave_organismo` para el lado
+    Python; si cambian las reglas, hay que tocar las dos.
+    """
     Session = get_sessionmaker()
     async with Session() as session:
         rows = (
             await session.execute(
                 text(
-                    """
-                    SELECT organismo, COUNT(*) c
+                    r"""
+                    SELECT mode() WITHIN GROUP (ORDER BY organismo) AS organismo,
+                           COALESCE(jurisdiccion, '') AS jurisdiccion,
+                           COUNT(*) c
                     FROM norma
-                    WHERE organismo IS NOT NULL
+                    WHERE organismo IS NOT NULL AND btrim(organismo) <> ''
                       AND fecha_publicacion >= current_date - make_interval(days => :days)
-                    GROUP BY organismo
+                    GROUP BY COALESCE(jurisdiccion, ''),
+                             upper(btrim(regexp_replace(
+                                 regexp_replace(organismo, '\s+', ' ', 'g'),
+                                 '[\s\-–—:;,\.]+$', '')))
                     ORDER BY c DESC
                     LIMIT :limit
                     """
@@ -161,7 +183,10 @@ async def organismos(
                 {"days": days, "limit": limit},
             )
         ).all()
-    return [OrganismoStat(organismo=r[0], cantidad=int(r[1])) for r in rows]
+    return [
+        OrganismoStat(organismo=r[0], jurisdiccion=r[1] or None, cantidad=int(r[2]))
+        for r in rows
+    ]
 
 
 @router.get("/emisores", response_model=list[EmisorStat])

@@ -199,11 +199,18 @@ export default function DashboardView() {
         </FadeIn>
         <div className="border-t border-border-light">
           {organismos.map((o, i) => (
-            <FadeIn key={o.organismo} delay={i * 60}>
+            <FadeIn key={`${o.jurisdiccion || ''}|${o.organismo}`} delay={i * 60}>
               <div className="group grid grid-cols-[2.2rem_1fr_auto] items-center gap-3 py-3 border-b border-border-light transition-all duration-300 hover:pl-2 hover:bg-celeste/[0.03]">
                 <span className="font-mono text-[11px] text-celeste">{String(i + 1).padStart(2, '0')}</span>
                 <div className="min-w-0">
-                  <p className="text-[13px] text-text-primary truncate mb-1.5" title={o.organismo}>{o.organismo}</p>
+                  {/* La jurisdicción es parte del nombre: hay un Ministerio de
+                      Salud nacional, uno de CABA y uno de PBA, y son distintos. */}
+                  <p className="text-[13px] text-text-primary truncate mb-1.5" title={`${o.organismo}${o.jurisdiccion ? ` · ${o.jurisdiccion}` : ''}`}>
+                    {o.organismo}
+                    {o.jurisdiccion && (
+                      <span className="text-text-tertiary font-mono text-[10px] ml-1.5">{o.jurisdiccion}</span>
+                    )}
+                  </p>
                   <div className="w-full bg-bg-tertiary/60 rounded-full h-[3px] overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-1000 ease-out"
