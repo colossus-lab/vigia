@@ -31,7 +31,17 @@ def _check_one(src_def: dict, row: Any | None, now: datetime, today: date) -> li
         return issues
 
     if row.last_status == "error":
-        issues.append(f"última corrida en error: {(row.last_error or '')[:200]}")
+        # El fallback importa: si `last_error` viene vacío el mail decía
+        # "última corrida en error:" y cortaba ahí, que es peor que no avisar —
+        # sabés que algo falló y no tenés ni por dónde empezar. Pasó con
+        # senado_proyectos el 2026-08-03.
+        detalle = (row.last_error or "").strip()
+        issues.append(
+            f"última corrida en error: {detalle[:200]}"
+            if detalle
+            else "última corrida en error, pero la task no dejó mensaje "
+                 "(revisar `docker logs vigia-worker-1`)"
+        )
 
     cadence = src_def.get("cadence_hours")
     if cadence and row.last_run_at is not None:

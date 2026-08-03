@@ -19,8 +19,13 @@ SOURCES: dict[str, dict] = {
         "kind": "feed",
         "base_url": "https://datos.jus.gob.ar",
         "cadence_hours": 24,
-        # El dataset upstream se refresca ~mensualmente con lag: tolerar hasta 20 días.
-        "freshness_slo_days": 20,
+        # El dataset upstream se refresca MENSUALMENTE, así que la norma más nueva
+        # envejece hasta ~35 días antes de que llegue la tanda siguiente: con SLO
+        # de 20 la fuente pasaba más tiempo en `stale` que en `ok` sin estar rota.
+        # Medido: la tanda con datos hasta el 30/06 se ingirió el 02/07, o sea el
+        # ciclo real es "cierre de mes + 2 días". 45 deja margen para un mes largo
+        # más una demora de dos semanas; si lo supera, ahí sí pasó algo.
+        "freshness_slo_days": 45,
     },
     "hcdn_proyectos": {
         "code": "hcdn_proyectos",
@@ -92,8 +97,15 @@ SOURCES: dict[str, dict] = {
         "kind": "api",
         "base_url": "https://consultapublica.argentina.gob.ar",
         "cadence_hours": 24,
-        # ~5-15/mes: una nueva por mes ya es ritmo normal.
-        "freshness_slo_days": 60,
+        # SIN SLO de frescura, y es deliberado. El comentario anterior estimaba
+        # "~5-15/mes"; los datos reales dicen otra cosa: 72 consultas en total,
+        # hueco promedio de 46 días y máximo de 330. Con un SLO de 60d la fuente
+        # vivía en `stale` y mandaba mail sin que hubiera nada roto.
+        #
+        # Para una fuente genuinamente esporádica la frescura no distingue "no
+        # hubo consultas nuevas" de "el scraper se rompió": las dos se ven igual.
+        # Lo que sí distingue es `cadence_hours`, que verifica que la task corra.
+        "freshness_slo_days": None,
     },
     "bocaba": {
         "code": "bocaba",

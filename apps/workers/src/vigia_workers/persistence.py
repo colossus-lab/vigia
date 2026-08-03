@@ -130,9 +130,17 @@ async def with_status(source_codes: list[str], coro_factory):
     try:
         result = await coro_factory()
     except Exception as exc:
+        # El tipo va SIEMPRE, no solo cuando `str(exc)` está vacío. Las excepciones
+        # de red —justo las más frecuentes acá— suelen tener str() vacío
+        # (httpx.ConnectError(), ReadTimeout(), TimeoutError()), y entonces el mail
+        # de frescura decía "última corrida en error:" y cortaba: sabías que algo
+        # falló pero no qué. Con el tipo, un timeout se distingue de un 500 o de un
+        # parseo roto sin entrar al servidor.
+        detalle = str(exc).strip()
+        mensaje = f"{type(exc).__name__}: {detalle}" if detalle else type(exc).__name__
         for code in source_codes:
             try:
-                await mark_source_run(code, status="error", error=str(exc)[:1000])
+                await mark_source_run(code, status="error", error=mensaje[:1000])
             except Exception:
                 pass
         raise
