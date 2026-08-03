@@ -99,6 +99,22 @@ async def _check_sources() -> dict[str, Any]:
                 "issues": issues,
             }
             if not issues:
+                # Limpiar lo que ESTE chequeo haya marcado antes. Sin esto, una
+                # fuente que se recupera queda en `stale` hasta que su propia
+                # ingesta la pise —hasta 24h, o más si corre semanal— y
+                # /health/sources, que es el target de los smoke tests, reporta
+                # un problema que ya no existe.
+                #
+                # Solo se toca `stale`: `error` lo maneja la task en with_status y
+                # es información más específica, así que no se pisa desde acá.
+                if row is not None and row.last_status == "stale":
+                    await session.execute(
+                        text(
+                            "UPDATE source_catalog SET last_status = 'ok', last_error = NULL "
+                            "WHERE code = :code AND last_status = 'stale'"
+                        ),
+                        {"code": code},
+                    )
                 continue
             incidents.append(f"{code}: " + "; ".join(issues))
             # No pisar "error" (es información más específica que "stale").

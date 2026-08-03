@@ -115,3 +115,21 @@ def test_infoleg_tolera_el_ciclo_mensual_real():
         {"freshness_slo_days": 45}, _fila(max_fecha=hoy - timedelta(days=60)), ahora, hoy
     )
     assert roto, "dos meses sin datos SÍ tiene que alertar"
+
+
+# --- el flag tiene que poder volver a ok -----------------------------------
+
+
+def test_una_fuente_sana_no_genera_incidentes():
+    """La contraparte del auto-clear: sin issues no hay nada que reportar.
+
+    El UPDATE que devuelve `stale` -> `ok` se prueba contra la base en el deploy;
+    acá se fija la condición que lo dispara, que es la que se puede romper al
+    tocar `_check_one`.
+    """
+    issues = _check_one(
+        {"cadence_hours": 24, "freshness_slo_days": 45},
+        _fila(max_fecha=date.today() - timedelta(days=10)),
+        datetime.now(timezone.utc), date.today(),
+    )
+    assert issues == []
