@@ -75,6 +75,9 @@ class Norma(Base):
         # `ix_norma_fecha` no sirve (es ASC y la columna es nullable) y cada
         # request ordena la tabla entera. Ver migración 0008.
         Index("ix_norma_feed", text("fecha_publicacion DESC NULLS LAST, id DESC")),
+        # Orden de la sincronización incremental de /v1 (updated_at ASC, id ASC),
+        # que pagina por keyset. Ver migración 0009.
+        Index("ix_norma_updated", "updated_at", "id"),
         Index("ix_norma_tipo_sector", "tipo", "sector"),
         Index("ix_norma_emisor", "emisor"),
         Index("ix_norma_impacto", "impacto"),
