@@ -109,6 +109,29 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **BORA 2ª NO entra a `norma`**: va a `aviso_societario` (tabla y FTS propios, router `/avisos`, página "Radar societario") para no contaminar feed/stats/alertas.
 - **Plataforma gratuita, sin trial** (desde 2026-07-20): se eliminó el gating por free trial — `require_active_plan` ya no devuelve 402 `trial_expired` (solo exige sesión + membresía) y no hay cartel en el web. Los campos `trial_ends_at`/`VIGIA_TRIAL_DAYS` quedan inertes. **No reintroducir gating por plan/trial sin pedido explícito.** La monetización es aporte voluntario: sección pública `/apoyar` (links de Mercado Pago de la Fundación Colossus Lab + CBU), con `/apoyar/gracias` como back URL de MP.
 - **Alertas por-sector**: una alerta es válida con `keywords` **O** `sectores` (422 `criterio_vacio` solo si ambos vacíos). Sin keywords, el matcher filtra solo por `sector = ANY(...)` — sin el filtro FTS. `POST /alerts/preview` estima el volumen (normas de los últimos 30 días) reusando esa misma lógica.
+- **`/v1` es contrato con terceros; los routers sin prefijo son del web.** Leen la
+  misma tabla y son dos superficies distintas a propósito: `vigia_shared.schemas`
+  se mueve cuando el web necesita un campo, y si `/v1` reusara esos modelos un
+  ajuste de UI le rompería la integración a otro sin aparecer en el diff. El
+  contrato público vive en `routers/v1/schemas.py`: agregar un campo es explícito,
+  sacarlo es breaking. **No exponer `raw` ni `search_vector`** (hay un test que lo
+  chequea).
+- **`updated_since` CAMBIA el orden de `/v1/normas`** — de `fecha_publicacion DESC`
+  a `updated_at ASC`. No es un capricho: es la única forma de que la sync
+  incremental no se saltee filas (una fila modificada durante el recorrido se
+  mueve al final y se vuelve a ver; ordenado por fecha de publicación pasaría lo
+  contrario). Por eso **el modo viaja adentro del cursor** y reusar uno del otro
+  orden da 400 `cursor_de_otro_orden`.
+- **La paginación de `/v1` es keyset, no offset**, con comparación de tupla
+  (`(updated_at, id) > (:u0, :i0)`) para que sea condición de arranque del índice
+  — índice `ix_norma_updated` (migración 0009). El feed va en **dos tramos**
+  (primero con `fecha_publicacion`, después las NULL): un solo recorrido con
+  `... OR fecha_publicacion IS NULL` deja de ser tupla pura y Postgres vuelve a
+  escanear el índice desde el principio en cada página. `/v1` no devuelve `total`
+  (COUNT del corpus filtrado = seq scan de medio millón).
+- **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
+  respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
+  novedades. El feed interno sí, porque lo consume un browser.
 
 ## Diseño / UX
 

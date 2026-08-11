@@ -16,6 +16,7 @@ from vigia_api.routers import (
     normas,
     search,
     stats,
+    v1,
     workspaces,
 )
 
@@ -42,6 +43,11 @@ if _sentry_dsn:
 # Solo estos llevan Cache-Control: nada con sesión se cachea.
 _CACHEABLE_PREFIXES = ("/normas", "/stats", "/avisos", "/search")
 _CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=600"
+
+# `/v1` queda deliberadamente FUERA de la lista: es la superficie de
+# sincronización, y una respuesta guardada 120 s en un proxy intermedio le puede
+# hacer creer a un integrador que no hubo novedades cuando sí las hubo. El feed
+# interno no tiene ese problema porque lo consume un browser mirando pantallas.
 
 
 def create_app() -> FastAPI:
@@ -92,6 +98,9 @@ def create_app() -> FastAPI:
     app.include_router(search.router)
     app.include_router(stats.router)
     app.include_router(avisos.router)
+    # API pública versionada. Último a propósito: los routers internos ya
+    # ocuparon sus prefijos y `/v1` no puede pisarlos ni al revés.
+    app.include_router(v1.router)
     return app
 
 
