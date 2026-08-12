@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Users, Plus, Trash2, Copy, Building2, Info, MessageCircle, Check, Mail, Download, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { authedFetch, AUTH_ENABLED, BFF_BASE } from '@/lib/authClient';
+import SettingsNav from '@/components/SettingsNav';
 
 function inviteMessage(wsName, token) {
   const link = `${location.origin}/auth/invite?token=${token}`;
@@ -98,6 +99,7 @@ export default function WorkspaceSettings() {
   if (!AUTH_ENABLED) {
     return (
       <div className="max-w-2xl mx-auto">
+        <SettingsNav />
         <div className="card p-5 border-l-4 border-l-inst-accent flex items-start gap-2">
           <Info size={16} className="text-inst-accent shrink-0 mt-0.5" />
           <p className="text-[13px] text-text-secondary leading-relaxed">
@@ -115,6 +117,7 @@ export default function WorkspaceSettings() {
 
   return (
     <div className="max-w-2xl mx-auto animate-fade-in">
+      <SettingsNav />
       <div className="mb-6">
         <h2 className="text-xl font-bold text-text-primary tracking-tight mb-0.5">Workspace</h2>
         <p className="text-sm text-text-tertiary">Miembros e invitaciones</p>

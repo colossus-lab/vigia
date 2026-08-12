@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     # producción; el default es prendido.
     ratelimit_enabled: bool = True
 
+    # Cuota de la API pública, por API key (ver core/ratelimit.limitar_por_apikey).
+    # El límite por minuto ataja ráfagas; el diario acota el volumen total. Los
+    # defaults son holgados a propósito: la plataforma es gratuita y lo que se
+    # busca es ver quién usa qué, no estrangular a nadie. Una sync completa del
+    # corpus (~543k normas / 200 por página) son ~2.700 requests, así que 20.000
+    # diarios dejan margen para varias corridas y el trabajo incremental.
+    apikey_rate_por_minuto: int = 120
+    apikey_rate_por_dia: int = 20_000
+
+    # Techo de keys vivas por workspace. Suficiente para separar entornos
+    # (prod/staging/local) y rotar sin downtime; corta la creación en loop.
+    apikey_max_por_workspace: int = 10
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]

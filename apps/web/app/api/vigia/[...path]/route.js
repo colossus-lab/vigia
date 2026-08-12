@@ -36,6 +36,12 @@ const ALLOWLIST = [
   ['GET', /^\/workspaces\/me\/invitations$/],
   ['POST', /^\/workspaces\/me\/invitations$/],
   ['DELETE', /^\/workspaces\/me\/members\/\d+$/],
+  // API keys. Solo alta, listado y revocación: el secreto viaja UNA vez, en la
+  // respuesta del POST, y no hay endpoint que lo devuelva después ni acá ni en
+  // la API.
+  ['GET', /^\/api-keys$/],
+  ['POST', /^\/api-keys$/],
+  ['DELETE', /^\/api-keys\/\d+$/],
   ['GET', /^\/account\/export$/],
   ['DELETE', /^\/account$/],
   ['POST', /^\/invitations\/[\w-]+\/accept$/],
