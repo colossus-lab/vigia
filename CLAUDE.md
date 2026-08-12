@@ -129,6 +129,29 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   `... OR fecha_publicacion IS NULL` deja de ser tupla pura y Postgres vuelve a
   escanear el índice desde el principio en cada página. `/v1` no devuelve `total`
   (COUNT del corpus filtrado = seq scan de medio millón).
+- **`/v1` exige API key; los routers del web NO.** La dependency
+  (`limitar_por_apikey`) cuelga del router de `/v1` entero y no de cada endpoint,
+  así que sumar uno nuevo no implica acordarse de gatearlo. Con
+  `AUTH_ENABLED=false` (dev) `/v1` queda abierto, igual que el resto.
+- **`/api-keys` se autentica con la SESIÓN, no con una key** — una key no puede
+  emitir ni revocar otra key, así que una filtrada solo sirve para leer `/v1`.
+  Alta y revocación piden `require_escritura` (owner|admin): una key da acceso al
+  corpus en nombre del workspace y un `viewer` no debería poder acuñarla.
+- **Del secreto solo se guarda el SHA-256** y se muestra **una vez**. SHA-256 y no
+  bcrypt/argon2 a propósito: es un secreto aleatorio de 256 bits que generamos
+  nosotros, no un password — no hay diccionario que atacar y un KDF lento solo
+  agregaría latencia a cada request de `/v1`. El índice único sobre `token_hash`
+  es lo que hace que verificar sea un lookup.
+- **El rate limit de alta de keys (30/h) tiene que quedar por encima de
+  `apikey_max_por_workspace` (10)**: si fueran iguales, al llegar al techo saldría
+  un 429 genérico y el 409 `limite_de_keys_alcanzado` sería inalcanzable.
+- **La cuota diaria vive en memoria y se pierde al reiniciar la API**
+  (`_diarios` en `core/ratelimit.py`, contador por día calendario UTC — O(1), no
+  una cola de timestamps). Es cuota de cortesía, no facturación. El reset a las
+  00:00 UTC viaja en `X-RateLimit-Reset`.
+- **Todavía NO hay UI de keys**: para gestionarlas desde el web hay que agregar
+  `/api-keys` a la **allowlist** del BFF (`app/api/vigia/[...path]/route.js`) —
+  no es un proxy genérico a propósito.
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.

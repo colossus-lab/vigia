@@ -9,6 +9,7 @@ from vigia_api.core.settings import get_settings
 from vigia_api.routers import (
     account,
     alerts,
+    api_keys,
     auth,
     avisos,
     health,
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(account.router)
     app.include_router(invitations.router)
     app.include_router(alerts.router)
+    app.include_router(api_keys.router)
     app.include_router(normas.router)
     app.include_router(search.router)
     app.include_router(stats.router)

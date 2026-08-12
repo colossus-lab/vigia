@@ -19,6 +19,8 @@ ACTION_INVITE_ACCEPTED = "invite.accepted"
 ACTION_MEMBER_LEFT = "member.left"
 ACTION_MEMBER_REMOVED = "member.removed"
 ACTION_ONBOARDED = "workspace.onboarded"
+ACTION_APIKEY_CREATED = "apikey.created"
+ACTION_APIKEY_REVOKED = "apikey.revoked"
 
 
 

@@ -335,6 +335,47 @@ class WorkspaceInvitation(Base):
     )
 
 
+class ApiKey(Base):
+    """Credencial de máquina para la API pública `/v1`, ligada a un workspace.
+
+    No reusamos el JWT de sesión porque no le sirve a un integrador: dura 24h y
+    lo emite el web después de Google OAuth, así que no hay forma de obtenerlo ni
+    de renovarlo desde un script. Una key vive hasta que alguien la revoca, se
+    rota sin tocar la sesión de nadie y deja su propio rastro de uso.
+
+    **Del secreto solo se guarda el SHA-256** (`token_hash`, único e indexado:
+    verificar una key es un lookup, no un recorrido). El secreto completo se
+    muestra una sola vez, al crearla, y no se puede recuperar después.
+
+    `revoked_at` en vez de DELETE: una key revocada sigue siendo la explicación
+    de lo que haya en el audit log.
+    """
+
+    __tablename__ = "api_key"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_api_key_hash"),
+        Index("ix_api_key_workspace", "workspace_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspace.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("app_user.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Los primeros caracteres del secreto, para poder identificar la key en una
+    # lista sin revelarla ("vg_live_a3f2…"). Revela ~48 bits de los 256.
+    prefix: Mapped[str] = mapped_column(String(24), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class AuditLog(Base):
     """Bitácora append-only por workspace (login, invite, member, etc.)."""
 
