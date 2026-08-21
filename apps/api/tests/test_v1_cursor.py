@@ -21,6 +21,8 @@ from fastapi.testclient import TestClient
 from vigia_api.main import create_app
 from vigia_api.routers.v1 import cursor as cur
 
+from conftest import paths_de
+
 
 def _crudo(payload: dict) -> str:
     """Arma un cursor a mano para simular uno viejo, ajeno o manipulado."""
@@ -101,7 +103,7 @@ def client() -> TestClient:
 
 
 def test_v1_esta_montado():
-    rutas = {getattr(r, "path", None) for r in create_app().routes}
+    rutas = paths_de(create_app())
     assert "/v1/normas" in rutas
     assert "/v1/normas/{norma_id}" in rutas
 
@@ -109,7 +111,7 @@ def test_v1_esta_montado():
 def test_los_routers_internos_siguen_donde_estaban():
     # El punto de /v1 es no tocar lo que consume el web: si esto se cae, el
     # BFF y las páginas se quedan sin backend.
-    rutas = {getattr(r, "path", None) for r in create_app().routes}
+    rutas = paths_de(create_app())
     for ruta in ("/normas", "/normas/{norma_id}", "/search", "/stats/dashboard"):
         assert ruta in rutas
 

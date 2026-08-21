@@ -12,6 +12,8 @@ from pydantic import ValidationError
 from vigia_api.core.settings import Settings
 from vigia_api.main import create_app
 
+from conftest import paths_de
+
 
 # --- #1: el arranque aborta con un secreto que no sirve ---------------------
 
@@ -50,7 +52,7 @@ def test_sin_auth_no_se_exige_secreto(secreto):
 
 
 def _rutas(app) -> set[str]:
-    return {getattr(r, "path", None) for r in app.routes}
+    return paths_de(app)
 
 
 def test_docs_cerrados_por_defecto(monkeypatch):

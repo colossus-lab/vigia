@@ -39,6 +39,8 @@ from vigia_api.core.ratelimit import (
 from vigia_api.core.settings import Settings
 from vigia_api.main import create_app
 
+from conftest import rutas_de
+
 
 @pytest.fixture(autouse=True)
 def _limpiar():
@@ -309,7 +311,7 @@ def _exige_api_key(route) -> bool:
 
 
 def test_todo_v1_exige_api_key(app_con_auth):
-    rutas = [r for r in app_con_auth.routes if getattr(r, "path", "").startswith("/v1")]
+    rutas = [r for r in rutas_de(app_con_auth) if r.path.startswith("/v1")]
     assert rutas, "no se registró ninguna ruta /v1"
     for r in rutas:
         assert _exige_api_key(r), f"{r.path} quedó sin credencial"
@@ -318,7 +320,7 @@ def test_todo_v1_exige_api_key(app_con_auth):
 def test_los_endpoints_del_web_siguen_sin_pedir_credencial(app_con_auth):
     """La dependency va en el router de /v1: no puede haber goteado al resto."""
     publicas = ("/normas", "/normas/ediciones", "/search", "/stats/dashboard", "/avisos", "/health")
-    porRuta = {getattr(r, "path", ""): r for r in app_con_auth.routes}
+    porRuta = {r.path: r for r in rutas_de(app_con_auth)}
     for ruta in publicas:
         assert ruta in porRuta, f"{ruta} desapareció"
         assert not _exige_api_key(porRuta[ruta]), f"{ruta} quedó pidiendo API key"

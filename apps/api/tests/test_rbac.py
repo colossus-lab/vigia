@@ -21,6 +21,8 @@ from vigia_api.core.security import WorkspaceContext, require_escritura, require
 from vigia_api.main import create_app
 from vigia_shared.constants import ROL_ADMIN, ROL_OWNER, ROL_VIEWER
 
+from conftest import rutas_de
+
 
 def _ctx(role: str) -> WorkspaceContext:
     return WorkspaceContext(user_id=1, workspace_id=1, role=role, plan="free")
@@ -93,8 +95,8 @@ ESCRITURA = [
 def test_endpoints_de_escritura_exigen_rol(metodo, path):
     app = create_app()
     rutas = [
-        r for r in app.routes
-        if isinstance(r, APIRoute) and r.path == path and metodo in r.methods
+        r for r in rutas_de(app)
+        if r.path == path and metodo in (r.methods or ())
     ]
     assert rutas, f"no existe {metodo} {path}"
     assert require_escritura in _deps_de(rutas[0]), (
@@ -116,8 +118,8 @@ SIN_ROL = [
 def test_lectura_y_acciones_propias_no_exigen_rol(metodo, path):
     app = create_app()
     rutas = [
-        r for r in app.routes
-        if isinstance(r, APIRoute) and r.path == path and metodo in r.methods
+        r for r in rutas_de(app)
+        if r.path == path and metodo in (r.methods or ())
     ]
     assert rutas, f"no existe {metodo} {path}"
     assert require_escritura not in _deps_de(rutas[0]), (
