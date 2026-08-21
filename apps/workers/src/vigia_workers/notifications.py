@@ -100,3 +100,43 @@ def render_invitation(
         f'<p style="margin:14px 0 0;color:#636E85;font-size:11px">Inteligencia legislativa · Colossus Lab</p>'
         f"</div>"
     )
+
+
+def render_sin_creditos(workspace_name: str, renueva: str, contacto: str) -> str:
+    """HTML del aviso de "te quedaste sin créditos".
+
+    El orden es deliberado: primero lo que NO se pierde (las alertas siguen
+    registrando y está todo en la app), después cómo se sigue, y al final la
+    salida sin pagar. Al revés se lee como un cobro.
+
+    Sale UNA vez por período — la marca la lleva `credito_contador`.
+    """
+    return (
+        f'<div style="font-family:Inter,system-ui,sans-serif;background:#06090F;color:#E8ECF4;'
+        f'padding:32px 24px;border-radius:12px;max-width:600px">'
+        f'<p style="margin:0 0 4px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#636E85">'
+        f"VIGÍA / CRÉDITOS</p>"
+        f'<h2 style="margin:0 0 10px;font-size:20px;color:#E8ECF4">Se te acabaron los créditos de '
+        f'<em style="color:#F6B40E;font-style:italic">{_esc(workspace_name)}</em></h2>'
+        f'<p style="margin:0 0 16px;font-size:13px;color:#8892A8;line-height:1.6">'
+        f"<strong style=\"color:#E8ECF4\">No perdiste nada.</strong> Tus alertas siguen "
+        f"funcionando y registrando cada norma que coincide: está todo en Vigía, esperándote. "
+        f"Lo único que se pausó son estos mails.</p>"
+        f'<p style="margin:0 0 22px;font-size:13px;color:#8892A8;line-height:1.6">'
+        f"Los créditos se renuevan el <strong style=\"color:#E8ECF4\">{_esc(renueva)}</strong> "
+        f"y volvés a recibirlos automáticamente.</p>"
+        f'<a href="{WEB_BASE_URL}/alerts" style="display:inline-block;background:#74ACDF;color:#06090F;'
+        f'font-weight:700;font-size:14px;padding:10px 22px;border-radius:999px;text-decoration:none">'
+        f"Ver lo que se detectó</a>"
+        f'<p style="margin:22px 0 0;font-size:13px;color:#8892A8;line-height:1.6">'
+        f"¿Querés seguir recibiéndolos ahora? Quienes sostienen Vigía con un aporte mensual "
+        f"recargan cada quincena o trabajan sin cupo: "
+        f'<a href="{WEB_BASE_URL}/apoyar" style="color:#74ACDF;text-decoration:none">'
+        f"apoyá el proyecto</a>.</p>"
+        f'<p style="margin:14px 0 0;font-size:13px;color:#8892A8;line-height:1.6">'
+        f"Y si no podés aportar, escribinos igual a "
+        f'<a href="mailto:{_esc(contacto)}" style="color:#74ACDF;text-decoration:none">{_esc(contacto)}</a>: '
+        f"el acceso no depende de poder pagar.</p>"
+        f'<p style="margin:20px 0 0;color:#636E85;font-size:11px">Inteligencia legislativa · Colossus Lab</p>'
+        f"</div>"
+    )

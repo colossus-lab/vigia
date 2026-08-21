@@ -32,7 +32,11 @@ jobs:
           pip install -e packages/shared -e packages/connectors -e apps/workers -e apps/api
           pip install pytest pytest-asyncio respx
       - name: Run tests
-        run: pytest packages/connectors/tests apps/workers/tests -q
+        # Las cuatro carpetas, no dos: `packages/shared/tests` (aritmética de
+        # créditos) y `apps/api/tests` (RBAC, rate limit, cursores de /v1) existían
+        # pero no se corrían acá, así que romperlas no bloqueaba el build.
+        # Los tests que necesitan Postgres se saltean solos sin VIGIA_TEST_DATABASE_URL.
+        run: pytest packages/connectors/tests packages/shared/tests apps/workers/tests apps/api/tests -q
 
   build:
     runs-on: ubuntu-latest

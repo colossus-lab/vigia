@@ -139,5 +139,11 @@ celery_app.conf.update(
             "task": "vigia_workers.maintenance.purge_audit_log",
             "schedule": crontab(day_of_week=0, hour=5, minute=0),
         },
+        # Contadores de créditos de períodos viejos — semanal, domingo 05:15 ART.
+        # Va después del purge de audit_log y fuera de la ventana de ingesta.
+        "purge-creditos": {
+            "task": "vigia_workers.maintenance.purge_creditos",
+            "schedule": crontab(day_of_week=0, hour=5, minute=15),
+        },
     },
 )

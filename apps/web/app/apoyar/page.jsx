@@ -2,20 +2,35 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Eye, Copy, Check, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Eye, Copy, Check, ArrowLeft, ExternalLink, Mail } from 'lucide-react';
 import FadeIn from '@/components/FadeIn';
 
 const CBU = '0070011520000022781626';
 const CBU_PRETTY = '0070 0115 2000 0022 7816 26';
+const CONTACTO = 'devops@colossuslab.org';
 
-/* Los tres niveles son suscripciones mensuales (débito automático en MP).
-   El monto libre lo define el donante en el checkout. */
+/* Dos niveles, suscripciones mensuales (débito automático en MP). El monto
+   libre lo define el donante en el checkout.
+
+   `efecto` es lo único que el aporte cambia de verdad, y lo que cambia entre
+   niveles NO es el tamaño del cupo sino cada cuánto se renueva. Se escribe así
+   a propósito: "$5.000 = N créditos" convierte el aporte en una lista de
+   precios, que es justo lo que la fundación no hace.
+
+   OJO: el tier Adherente ($3.000, mpago.la/2vLd7UV) se sacó de la página pero
+   el link sigue vivo y sus suscriptores siguen pagando. A ellos les corresponde
+   `base`, igual que a Colaborador/a — está anotado en infra/DEPLOY.md. */
 const TIERS = [
-  { k: 'Adherente', amt: '$3.000', url: 'https://mpago.la/2vLd7UV' },
-  { k: 'Colaborador/a', amt: '$5.000', url: 'https://mpago.la/258XizR', feat: true },
-  { k: 'Patrocinador/a', amt: '$20.000', url: 'https://mpago.la/2V9fVHo' },
+  { k: 'Colaborador/a', amt: '$5.000', url: 'https://mpago.la/258XizR', feat: true, efecto: 'Créditos que se renuevan cada quincena' },
+  { k: 'Patrocinador/a', amt: '$20.000', url: 'https://mpago.la/2V9fVHo', efecto: 'Sin cupo: alertas sin contar créditos' },
 ];
 const MONTO_LIBRE_URL = 'https://mpago.la/15TqeBQ';
+
+const PASOS = [
+  'Suscribite por Mercado Pago acá arriba, o transferí al CBU de abajo.',
+  <>Escribinos a <a href={`mailto:${CONTACTO}`} className="text-celeste hover:text-celeste-bright transition-colors">{CONTACTO}</a> con el mail con el que entrás a Vigía — que no siempre es el de Mercado Pago.</>,
+  'En el día te lo activamos.',
+];
 
 export default function ApoyarPage() {
   const [copied, setCopied] = useState(false);
@@ -64,8 +79,33 @@ export default function ApoyarPage() {
           </p>
         </FadeIn>
 
+        {/* Qué es un crédito. Va antes de las tarjetas: sin esto, "más créditos"
+            no significa nada y el aporte se lee como un peaje. */}
+        <FadeIn delay={90}>
+          <div className="card p-6 mb-9">
+            <h2 className="text-[17px] font-bold text-text-primary mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+              ¿Qué es un crédito?
+            </h2>
+            <p className="text-[13px] text-text-secondary leading-relaxed mb-3">
+              El corpus no se mide. Buscar, leer una norma, seguir el tracker de DNU, mirar las
+              estadísticas: todo eso es libre, no lleva cuenta y no necesita ni que tengas cuenta.
+            </p>
+            <p className="text-[13px] text-text-secondary leading-relaxed mb-3">
+              Lo único que se cuenta son <strong className="text-text-primary">los mails que te
+              mandamos a vos</strong> cuando una de tus alertas encuentra algo. Un crédito es un
+              mail. Todos arrancan con <strong className="text-text-primary">100 por mes</strong>,
+              que alcanzan para unos tres avisos por día — bastante más de lo que usa casi
+              cualquiera.
+            </p>
+            <p className="text-[12px] text-text-tertiary leading-relaxed">
+              Si se te acaban, tus alertas siguen registrando todo igual y lo ves en Vigía cuando
+              entrás; lo que se pausa hasta el mes siguiente son los mails.
+            </p>
+          </div>
+        </FadeIn>
+
         <FadeIn delay={120}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             {TIERS.map((t) => (
               <div
                 key={t.k}
@@ -75,7 +115,8 @@ export default function ApoyarPage() {
                 <span className="font-mono text-[1.9rem] font-medium text-text-primary leading-tight">
                   {t.amt}<span className="text-[0.85rem] text-text-tertiary"> / mes</span>
                 </span>
-                <span className="text-[12px] text-text-secondary mb-3">Débito automático mensual</span>
+                <span className="text-[12px] text-text-secondary mb-1">{t.efecto}</span>
+                <span className="text-[11px] text-text-tertiary mb-3">Débito automático mensual</span>
                 <a
                   href={t.url}
                   target="_blank"
@@ -112,7 +153,28 @@ export default function ApoyarPage() {
           </p>
         </FadeIn>
 
-        <FadeIn delay={160}>
+        {/* Activación manual: no hay webhook de Mercado Pago, y el mail de MP
+            casi nunca es el mail con el que la persona entra a Vigía. */}
+        <FadeIn delay={150}>
+          <div className="card p-6 mb-8 border-l-4 border-l-celeste">
+            <div className="flex items-center gap-2 mb-3">
+              <Mail size={15} className="text-celeste shrink-0" />
+              <h2 className="text-[17px] font-bold text-text-primary" style={{ fontFamily: 'var(--font-display)' }}>Después de aportar, avisanos</h2>
+            </div>
+            <ol className="space-y-2.5">
+              {PASOS.map((paso, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-celeste/10 border border-celeste/30 text-celeste font-mono text-[10px] flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span className="text-[13px] text-text-secondary leading-relaxed">{paso}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </FadeIn>
+
+        <FadeIn delay={180}>
           <div className="card p-6 mb-8">
             <h2 className="text-[17px] font-bold text-text-primary mb-1" style={{ fontFamily: 'var(--font-display)' }}>¿Preferís un aporte único?</h2>
             <p className="text-[13px] text-text-secondary mb-1">Transferí el monto que quieras, una sola vez o cuando puedas, desde cualquier banco o billetera.</p>
@@ -137,11 +199,22 @@ export default function ApoyarPage() {
           </div>
         </FadeIn>
 
-        <FadeIn delay={200}>
-          <div className="flex items-start gap-2.5 border-l-2 border-celeste pl-4 py-1 mb-10">
+        <FadeIn delay={210}>
+          <div className="flex items-start gap-2.5 border-l-2 border-celeste pl-4 py-1 mb-6">
             <p className="text-[13px] text-text-secondary leading-relaxed">
-              <span className="text-text-primary font-semibold">Ningún aporte destraba funciones.</span> Todo Vigía es y
-              seguirá siendo gratis para todos — el que aporta banca lo público, no compra un privilegio. Gracias.
+              <span className="text-text-primary font-semibold">El aporte no compra funciones.</span> Todo
+              Vigía —el Boletín, el Congreso, el buscador, cada norma— es y seguirá siendo gratis para
+              todos, sin medidor y sin cuenta. Lo único que el aporte cambia es cuánto aire tenés en los
+              mails que te mandamos a vos, porque son lo único que cuesta por persona. El que aporta
+              banca lo público; el resto no pierde nada.
+            </p>
+          </div>
+          <div className="flex items-start gap-2.5 border-l-2 border-sol pl-4 py-1 mb-10">
+            <p className="text-[13px] text-text-secondary leading-relaxed">
+              <span className="text-text-primary font-semibold">Y si no podés aportar, escribinos igual.</span>{' '}
+              Si te quedaste sin créditos y los necesitás, mandanos un mail a{' '}
+              <a href={`mailto:${CONTACTO}`} className="text-celeste hover:text-celeste-bright transition-colors">{CONTACTO}</a>{' '}
+              y lo resolvemos: el acceso no depende de poder pagar.
             </p>
           </div>
           <p className="text-[10px] text-text-tertiary font-mono">Datos públicos verificables · Colossus Lab · BA</p>

@@ -5,6 +5,7 @@ se gestionan las suscripciones y se leen los matches.
 """
 from __future__ import annotations
 
+import math
 from datetime import date as Date
 from datetime import datetime
 from typing import Annotated
@@ -114,7 +115,38 @@ class PreviewSample(BaseModel):
 
 class PreviewOut(BaseModel):
     count_30d: int
+    #: Cuántos créditos consumiría al mes (1 crédito = 1 mail). Ver `_digests_estimados`.
+    creditos_estimados_mes: int
     sample: list[PreviewSample]
+
+
+#: Techo de mails que un workspace puede recibir en un mes.
+#:
+#: No es 30×24 aunque el matcher corra cada hora: las normas llegan en ráfagas
+#: (una edición del BORA entera de golpe), así que lo que manda es cuántas
+#: ventanas de ingesta traen algo. Calibrado contra 30 días de producción, donde
+#: el workspace más pesado —con 14 alertas— recibió 60.
+_TECHO_MAILS_MES = 60
+
+
+def _digests_estimados(count_30d: int) -> int:
+    """De "cuántas normas matchean" a "cuántos mails vas a recibir".
+
+    No son lo mismo y por mucho: 20 normas que caen juntas en una corrida viajan
+    en un solo mail. El modelo es el de ventanas ocupadas —cuántas de las ~60
+    ráfagas del mes traen al menos una coincidencia— que se comporta bien en las
+    dos puntas: con pocas normas da ~1 mail por norma, y con muchas satura en el
+    techo en vez de crecer para siempre.
+
+    Contrastado con producción: 20 normas/mes → 17 (la mediana real es 18);
+    200 → 58 (el máximo real es 60).
+
+    Es por-alerta y de arriba: varias alertas que coinciden en la misma corrida
+    viajan en el mismo mail y se cobran una sola vez.
+    """
+    if count_30d <= 0:
+        return 0
+    return round(_TECHO_MAILS_MES * (1 - math.exp(-count_30d / _TECHO_MAILS_MES)))
 
 
 @router.get("", response_model=list[AlertaOut])
@@ -212,6 +244,7 @@ async def preview_alerta(
         ).all()
     return PreviewOut(
         count_30d=int(count or 0),
+        creditos_estimados_mes=_digests_estimados(int(count or 0)),
         sample=[
             PreviewSample(tipo=r.tipo, titulo=r.titulo, fecha_publicacion=r.fecha_publicacion)
             for r in rows

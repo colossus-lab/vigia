@@ -24,6 +24,8 @@ from vigia_api.services.audit import (
     ACTION_ONBOARDED,
     write_audit_event,
 )
+from vigia_shared import creditos as cred
+from vigia_shared import creditos_db as cdb
 from vigia_shared.constants import ROL_ADMIN, ROL_OWNER, ROL_VIEWER
 from vigia_shared.models import AppUser, Workspace, WorkspaceInvitation, WorkspaceMember
 
@@ -48,6 +50,22 @@ class MemberOut(BaseModel):
     accepted: bool
 
 
+class CreditosOut(BaseModel):
+    """Saldo del período. Viaja piggyback en `WorkspaceMe` en vez de tener su
+    propio endpoint: así el front lo tiene en la misma llamada con la que ya
+    arranca, y no hay que sumar una regla a la allowlist del BFF."""
+
+    usados: float
+    cupo: int
+    #: None = sin cupo (nivel pleno). Distinto de 0 — el front discrimina por eso.
+    disponibles: float | None
+    agotados: bool
+    nivel: str | None
+    quincenal: bool
+    renueva: str
+    contacto: str
+
+
 class WorkspaceMe(BaseModel):
     id: int
     slug: str
@@ -59,6 +77,7 @@ class WorkspaceMe(BaseModel):
     seats_used: int
     onboarded: bool
     sectores_interes: list[str] | None
+    creditos: CreditosOut | None = None
 
 
 class OnboardingBody(BaseModel):
@@ -80,6 +99,18 @@ class InviteOut(BaseModel):
     email_sent: bool = False  # solo significativo en la respuesta del POST
 
 
+async def _creditos_de(session, ws: Workspace) -> CreditosOut:
+    """Estado de créditos del workspace, leído contra su propio período.
+
+    El período sale del plan (`base` cuenta por quincena), así que tiene que
+    calcularse igual acá y en el matcher o se leería un contador distinto del
+    que se cobra.
+    """
+    periodo = cred.periodo_de(ws.plan, ws.aporte)
+    usados = await cdb.leer(session, ws.id, periodo)
+    return CreditosOut(**cred.estado(usados, ws.plan, ws.aporte))
+
+
 @router.get("/me", response_model=WorkspaceMe)
 async def me(ctx: Annotated[WorkspaceContext, Depends(current_workspace)]) -> WorkspaceMe:
     # Exento del check de trial: el cliente necesita poder leer su propio estado
@@ -92,10 +123,12 @@ async def me(ctx: Annotated[WorkspaceContext, Depends(current_workspace)]) -> Wo
         seats = await session.scalar(
             select(func.count()).select_from(WorkspaceMember).where(WorkspaceMember.workspace_id == ws.id)
         )
+        creditos = await _creditos_de(session, ws)
     return WorkspaceMe(
         id=ws.id, slug=ws.slug, name=ws.name, plan=ws.plan, trial_ends_at=ctx.trial_ends_at,
         role=ctx.role, seat_limit=ws.seat_limit, seats_used=int(seats or 0),
         onboarded=ws.onboarded_at is not None, sectores_interes=ws.sectores_interes,
+        creditos=creditos,
     )
 
 
@@ -122,10 +155,11 @@ async def onboarding(
         seats = await session.scalar(
             select(func.count()).select_from(WorkspaceMember).where(WorkspaceMember.workspace_id == ws.id)
         )
+        creditos = await _creditos_de(session, ws)
     return WorkspaceMe(
         id=ws.id, slug=ws.slug, name=ws.name, plan=ws.plan, trial_ends_at=ctx.trial_ends_at,
         role=ctx.role, seat_limit=ws.seat_limit, seats_used=int(seats or 0),
-        onboarded=True, sectores_interes=ws.sectores_interes,
+        onboarded=True, sectores_interes=ws.sectores_interes, creditos=creditos,
     )
 
 

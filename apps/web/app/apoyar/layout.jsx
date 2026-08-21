@@ -5,7 +5,7 @@
 
 const TITLE = 'Apoyar a Vigía — la plataforma es y seguirá siendo gratis';
 const DESCRIPTION =
-  'Vigía monitorea el Boletín Oficial, el Congreso y el BCRA, y es gratis para todos. Lo sostenemos con aportes de quienes lo usan: suscripción mensual desde $3.000 —o el monto que quieras— por Mercado Pago, o transferencia a la Fundación Colossus Lab.';
+  'Vigía monitorea el Boletín Oficial, el Congreso y el BCRA, y el corpus es gratis para todos, sin medidor. Lo sostenemos con aportes de quienes lo usan: suscripción mensual desde $5.000 —o el monto que quieras— por Mercado Pago, o transferencia a la Fundación Colossus Lab.';
 
 export const metadata = {
   title: TITLE,
