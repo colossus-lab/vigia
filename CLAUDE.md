@@ -19,7 +19,7 @@ apps/web/       Next.js 16 App Router (JSX, no TS) — tema OpenArg dark + palet
 apps/workers/   Celery (vigia_workers) — tasks de ingesta + matching de alertas + beat schedule
 packages/shared/      modelos SQLAlchemy + schemas Pydantic + constantes (vigia_shared)
 packages/connectors/  InfoLEG + HCDN (vigia_connectors)
-db/alembic/     migraciones (0001 inicial, 0002 multitenant, 0003 alertas)
+db/alembic/     migraciones (0001 inicial … 0010 api_key, 0011 créditos)
 infra/          Caddyfile, ec2-user-data.sh, DEPLOY.md (runbook completo)
 ```
 
@@ -54,6 +54,13 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 
 - **DNU**: InfoLEG los clasifica `tipo_norma="Decreto"` + `clase_norma="DNU"`. El slug se decide mirando `clase_norma` PRIMERO (`infoleg.py:tipo_slug`).
 - **PROYECTO**: no existe en InfoLEG; viene de `datos.hcdn.gob.ar` (CKAN `proyectos-parlamentarios`). La URL del CSV **cambia de nombre por versión** → siempre resolverla vía `package_show` (ya lo hace `HcdnClient.resolve_csv_url`).
+- **`resumen_ia` solo se genera una vez por norma**: `ingest_bora_primera` tiene
+  `lookback_days=5` y corre 2 veces por día, así que sin filtro cada aviso se le
+  mandaba al modelo ~10 veces (medido: 297 llamadas para 58 normas nuevas). El
+  `COALESCE` del upsert protege el dato guardado pero la llamada ya se pagó — por
+  eso `_ya_resumidas()` saltea los que ya tienen resumen antes de llamar. El
+  detalle HTML **sí** se sigue bajando: hace falta para detectar el DNU y para el
+  resumen del feed.
 - **Sample vs full**: `ingest_infoleg` (sample) es un CSV estático de 2022 — solo para dev. La frescura real la da `ingest_infoleg_full` (beat diario 03:00 ART). HCDN diario 08:00 ART. Alertas cada hora.
 - **Batch de upsert máx 1000 filas**: asyncpg limita 32.767 parámetros bind por statement (~17 columnas/fila). No subir `_FULL_BATCH`.
 - **Upserts idempotentes** por `(source_id, external_id)` con dedup intra-batch (ON CONFLICT no tolera duplicados en el mismo INSERT).
@@ -107,7 +114,28 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **Orden de beats importa**: `ingest_hcdn_proyectos` (08:00) pisa `norma.estado` a diario; `ingest_hcdn_movimientos` (08:30) lo re-deriva. No invertirlos.
 - **Fuentes nuevas**: runbook en `infra/DEPLOY.md` (dry-run → backfill → `match_alertas(notify=False)` → beat). Registry con SLOs en `vigia_shared/sources.py`; estado operativo sin ssh en `GET /health/sources`.
 - **BORA 2ª NO entra a `norma`**: va a `aviso_societario` (tabla y FTS propios, router `/avisos`, página "Radar societario") para no contaminar feed/stats/alertas.
-- **Plataforma gratuita, sin trial** (desde 2026-07-20): se eliminó el gating por free trial — `require_active_plan` ya no devuelve 402 `trial_expired` (solo exige sesión + membresía) y no hay cartel en el web. Los campos `trial_ends_at`/`VIGIA_TRIAL_DAYS` quedan inertes. **No reintroducir gating por plan/trial sin pedido explícito.** La monetización es aporte voluntario: sección pública `/apoyar` (links de Mercado Pago de la Fundación Colossus Lab + CBU), con `/apoyar/gracias` como back URL de MP.
+- **Plataforma gratuita, sin trial** (desde 2026-07-20): se eliminó el gating por free trial — `require_active_plan` ya no devuelve 402 `trial_expired` (solo exige sesión + membresía) y no hay cartel en el web. Los campos `trial_ends_at`/`VIGIA_TRIAL_DAYS` quedan inertes. La monetización es aporte voluntario: sección pública `/apoyar` (links de Mercado Pago de la Fundación Colossus Lab + CBU), con `/apoyar/gracias` como back URL de MP.
+- **Créditos: lo único medido es el mail de alerta** (desde 2026-08-21, `vigia_shared/creditos.py`,
+  migración 0011). El corpus —feed, búsqueda, detalle, `/v1`— **no se mide ni se corta nunca**, y
+  `require_active_plan` sigue sin chequear créditos: **no hay 402 en ninguna parte**. Lo que el cupo
+  frena es el `send_email` del digest, en `vigia_workers/alerts.py`. Sin cupo el match **igual queda
+  registrado** y se ve en la app — se pierde el aviso, nunca el dato.
+  - Se guarda **plata** (micro-dólares) y se muestran créditos: 1 crédito = US$0,01 = 1 mail. Cambiar
+    el valor del crédito es cambiar una constante, sin backfill.
+  - **El período va en la PK de `credito_contador`** (`2026-08`, o `2026-08q1/q2` para el nivel
+    `base`, que recarga por quincena). Por eso **no hay job de reset**: al rotar se escribe una fila
+    nueva que arranca en cero, y eso cubre gratis el cambio de nivel a mitad de mes. `periodo_de()`
+    tiene que dar lo mismo en la API y en el worker o se lee un contador distinto del que se cobra.
+  - **El aviso de "sin créditos" sale UNA vez por período**, con la marca `aviso_agotado_at` en esa
+    misma fila y un `UPDATE ... WHERE ... IS NULL RETURNING` que gana la carrera. El matcher corre
+    cada hora: sin ese candado saldría un mail por hora para avisar que dejamos de mandar mails.
+  - Cupo gratis **100/mes** (`VIGIA_CREDITOS_MES`). Calibrado contra prod: de 110 workspaces con
+    digests, la mediana consume 18/mes y el máximo 60 — hoy no le corta a nadie, y es a propósito.
+  - Niveles `free|base|pleno` en `workspace.plan` + metadatos en `workspace.aporte` (JSONB). Los
+    escribe **solo `scripts/aporte.py`**, nunca la web: no hay webhook de Mercado Pago. Dos
+    tiers en `/apoyar`: Colaborador/a $5.000 → `base`, Patrocinador/a $20.000 → `pleno`.
+  - El saldo viaja *piggyback* en `GET /workspaces/me` — sin endpoint propio y sin tocar la
+    allowlist del BFF.
 - **Alertas por-sector**: una alerta es válida con `keywords` **O** `sectores` (422 `criterio_vacio` solo si ambos vacíos). Sin keywords, el matcher filtra solo por `sector = ANY(...)` — sin el filtro FTS. `POST /alerts/preview` estima el volumen (normas de los últimos 30 días) reusando esa misma lógica.
 - **`/v1` es contrato con terceros; los routers sin prefijo son del web.** Leen la
   misma tabla y son dos superficies distintas a propósito: `vigia_shared.schemas`
@@ -149,9 +177,10 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   (`_diarios` en `core/ratelimit.py`, contador por día calendario UTC — O(1), no
   una cola de timestamps). Es cuota de cortesía, no facturación. El reset a las
   00:00 UTC viaja en `X-RateLimit-Reset`.
-- **Todavía NO hay UI de keys**: para gestionarlas desde el web hay que agregar
-  `/api-keys` a la **allowlist** del BFF (`app/api/vigia/[...path]/route.js`) —
-  no es un proxy genérico a propósito.
+- **La allowlist del BFF no es un proxy genérico a propósito**: sumar un endpoint
+  al web implica agregarlo a mano en `app/api/vigia/[...path]/route.js` (un rewrite
+  `:path*` ya se removió una vez por dejar un proxy abierto en Vercel). `/api-keys`
+  ya está en la allowlist y su UI vive en `app/(app)/settings/api/page.jsx`.
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.

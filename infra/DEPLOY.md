@@ -231,24 +231,59 @@ recién **después** del backfill (antes: "Sin ediciones"). Gotcha PBA: cert SSL
 DELETE FROM norma WHERE source_id = (SELECT id FROM source_catalog WHERE code = '<code>');
 ```
 
-## Free trial y membresías
+## Créditos y aportes
 
-Cada workspace tiene 30 días de prueba desde su creación (`VIGIA_TRIAL_DAYS`
-para cambiarlo). Al vencer, los endpoints gated devuelven `402 trial_expired`
-y el web muestra el cartel de membresía (contacto: `devops@colossuslab.org`).
-Los datos públicos no se ven afectados.
+La plataforma es gratuita: el corpus —feed, búsqueda, detalle, `/v1`— no se mide
+ni se corta nunca. Lo único que lleva cupo son **los mails de alerta**: 1 crédito
+= 1 mail, 100 por mes y por workspace (`VIGIA_CREDITOS_MES`). Al agotarse, el
+matcher deja de mandar el digest pero **los matches se siguen registrando** y se
+ven en la app; sale un aviso por mail, una sola vez por período.
 
-**Otorgar una membresía** (en el EC2, contra el Postgres del compose):
+El free trial quedó inerte (`VIGIA_TRIAL_DAYS`, `trial_ends_at`): no hay 402 en
+ninguna parte.
+
+**Activar el aporte de alguien.** No hay webhook de Mercado Pago: la persona se
+suscribe, nos escribe, y se corre el script. Acepta el slug del workspace o el
+mail con el que la persona entra a Vigía (que casi nunca es el de MP):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec -T db \
-  psql -U vigia vigia -c "UPDATE workspace SET plan = 'member' WHERE slug = '<slug>';"
+docker compose -f docker-compose.prod.yml exec -T api   python scripts/aporte.py ana@ministerio.gob.ar --nivel base
 ```
 
-El cartel se levanta solo (el web refetchea `/workspaces/me`); no requiere
-re-login. **Extender un trial** sin otorgar membresía: retro-datar
-`created_at` del workspace (misma vía, `UPDATE workspace SET created_at = ...`).
-Para encontrar el slug: `SELECT slug, name, plan, created_at FROM workspace;`.
+| Nivel | Qué cambia | Monto en `/apoyar` |
+|---|---|---|
+| `base` | El cupo se renueva **cada quincena** (el 1 y el 16) en vez de por mes | Colaborador/a $5.000 |
+| `pleno` | **Sin cupo**: no se le cuentan créditos | Patrocinador/a $20.000 |
+
+**Suscriptores del tier viejo:** hubo un tier *Adherente* de $3.000
+(`mpago.la/2vLd7UV`) que se sacó de la página al pasar a dos niveles. El link
+sigue vivo y quienes ya estaban suscriptos **siguen pagando**: a ellos les
+corresponde `base`, igual que a Colaborador/a. Si alguien escribe mencionando
+ése monto, no es un error.
+
+```bash
+python scripts/aporte.py --listar                    # aportes activos y si están vigentes
+python scripts/aporte.py <slug> --nivel pleno --hasta 2026-12-31
+python scripts/aporte.py <slug> --quitar             # vuelve a 'free'
+```
+
+Es idempotente y conserva el `desde` original al renovar o cambiar de nivel. Sin
+`--hasta` el aporte no vence. El cambio se ve solo en el web (refetchea
+`/workspaces/me`); no requiere re-login.
+
+**Si alguien no puede aportar y necesita cupo**, es el mismo script: `--nivel
+pleno`. El acceso no depende de poder pagar, y así lo dice `/apoyar`.
+
+**Ver el consumo real** (para recalibrar el cupo):
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T db psql -U vigia vigia -c   "SELECT periodo, count(*) AS workspaces, sum(micros)/10000 AS creditos,
+          max(micros)/10000 AS el_mas_pesado
+     FROM credito_contador GROUP BY periodo ORDER BY periodo DESC LIMIT 6;"
+```
+
+Los contadores de períodos viejos los borra `purge_creditos` (beat, domingo
+05:15 ART, conserva 13 períodos).
 
 ## Backups de la base (S3)
 

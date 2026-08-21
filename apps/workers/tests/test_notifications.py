@@ -42,3 +42,28 @@ def test_render_invitation_escapes_user_controlled_html():
     assert "&lt;i&gt;admin&lt;/i&gt;" in out
     # el accept_url legítimo NO debe romperse
     assert accept_url in out
+
+
+def test_render_sin_creditos_escapa_el_nombre_del_workspace():
+    from vigia_workers.notifications import render_sin_creditos
+
+    out = render_sin_creditos("<b>Acme & Co</b>", "2026-09-01", "devops@colossuslab.org")
+    assert "<b>Acme" not in out
+    assert "&lt;b&gt;Acme &amp; Co&lt;/b&gt;" in out
+
+
+def test_render_sin_creditos_dice_primero_lo_que_no_se_pierde():
+    """El orden no es cosmético: si el mail arranca pidiendo plata se lee como
+    un cobro. Primero que las alertas siguen andando, después el aporte."""
+    from vigia_workers.notifications import render_sin_creditos
+
+    out = render_sin_creditos("Acme", "2026-09-01", "devops@colossuslab.org")
+    assert out.index("No perdiste nada") < out.index("/apoyar")
+    # "Fundador" es vocabulario del proyecto hermano de Políticas Públicas y no
+    # existe en /apoyar, donde los niveles son Colaborador/a y Patrocinador/a.
+    assert "Fundador" not in out
+    # y la salida sin pagar tiene que estar
+    assert "el acceso no depende de poder pagar" in out
+    assert "devops@colossuslab.org" in out
+    # la fecha de renovación es lo que hace que la pausa no parezca definitiva
+    assert "2026-09-01" in out

@@ -269,8 +269,10 @@ class Workspace(Base):
     """Tenant. Cada usuario tiene al menos uno (su workspace personal al firmar in).
 
     Modelo híbrido B2C/B2B: un usuario individual usa su workspace personal;
-    una organización invita miembros al mismo workspace. `plan` queda como
-    placeholder para una futura capa de billing (hoy todos 'free').
+    una organización invita miembros al mismo workspace.
+
+    `plan` es el nivel de aporte: 'free' | 'base' | 'pleno' (ver
+    `vigia_shared.creditos`). Lo escribe `scripts/aporte.py`, nunca la web.
     """
 
     __tablename__ = "workspace"
@@ -280,6 +282,8 @@ class Workspace(Base):
     slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     plan: Mapped[str] = mapped_column(String(32), nullable=False, default="free")
+    #: Metadatos del aporte: {"desde", "hasta"?, "origen"}. `hasta` ausente = no vence.
+    aporte: Mapped[dict | None] = mapped_column(JSONB)
     seat_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     sectores_interes: Mapped[list[str] | None] = mapped_column(JSONB)  # onboarding
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -398,5 +402,33 @@ class AuditLog(Base):
     ip: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CreditoContador(Base):
+    """Consumo acumulado de un workspace en un período, en micro-dólares.
+
+    No es un ledger ni un saldo: es un contador, y el período va en la PK. Por
+    eso no hace falta ningún job de reset — al rotar el período se escribe una
+    fila nueva que arranca en cero, y eso cubre también el cambio de nivel a
+    mitad de mes (`base` cuenta por quincena, `free` por mes).
+
+    Se guarda plata y no créditos: el crédito es presentación
+    (`micros / MICROS_POR_CREDITO`) y su valor puede cambiar sin backfill.
+    """
+
+    __tablename__ = "credito_contador"
+
+    workspace_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workspace.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: "2026-08" (mensual) o "2026-08q1" / "2026-08q2" (quincenal, nivel base).
+    periodo: Mapped[str] = mapped_column(String(16), primary_key=True)
+    micros: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
+    #: Cuándo se avisó por mail que se agotó. Nullable = todavía no se avisó en
+    #: este período. Al rotar el período la fila es otra, así que se limpia sola.
+    aviso_agotado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

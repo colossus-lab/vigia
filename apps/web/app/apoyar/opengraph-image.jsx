@@ -5,7 +5,7 @@ import { ImageResponse } from 'next/og';
    la plataforma es gratis y se sostiene con aportes. */
 
 export const alt =
-  'Vigía es y seguirá siendo gratis. Bancá el proyecto con un aporte mensual desde $3.000 —o el monto que quieras— por Mercado Pago, o con una transferencia única. Inteligencia legislativa por OpenArg.';
+  'Vigía es y seguirá siendo gratis. Bancá el proyecto con un aporte mensual desde $5.000 —o el monto que quieras— por Mercado Pago, o con una transferencia única. Inteligencia legislativa por OpenArg.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -17,7 +17,7 @@ async function loadFont(path) {
   return res.arrayBuffer();
 }
 
-const CHIPS = ['DESDE $3.000 / MES', 'O EL MONTO QUE QUIERAS'];
+const CHIPS = ['DESDE $5.000 / MES', 'O EL MONTO QUE QUIERAS'];
 
 export default async function OpengraphImage() {
   const [displayBold, displayItalic, mono] = await Promise.all([

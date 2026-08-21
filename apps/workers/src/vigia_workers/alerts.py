@@ -3,7 +3,11 @@
 `match_alertas` corre tras cada ingesta (y por beat). Para cada alerta activa
 busca normas que matcheen su keyword (FTS español) y sector opcional, que no
 estén ya registradas en `alerta_match`, las inserta, y agrupa los matches
-nuevos por email de usuario para mandar un digest.
+nuevos por (usuario, workspace) para mandar un digest.
+
+Es el único lugar del sistema que cobra créditos: el digest es la única acción
+medida (ver `vigia_shared.creditos`). Sin cupo no se manda el mail, pero el
+match queda registrado igual — se pierde el aviso, nunca el dato.
 """
 from __future__ import annotations
 
@@ -12,9 +16,11 @@ from typing import Any
 
 from sqlalchemy import text
 
+from vigia_shared import creditos as cred
+from vigia_shared import creditos_db as cdb
 from vigia_shared.db import session_scope
 from vigia_workers.celery_app import celery_app
-from vigia_workers.notifications import render_digest, send_email
+from vigia_workers.notifications import render_digest, render_sin_creditos, send_email
 from vigia_workers.persistence import run_async
 
 
@@ -22,13 +28,22 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
     """Matchea normas contra alertas activas.
 
     `notify=False` (backfills): registra los matches con notified=true SIN
-    mandar digests — sin esto, el primer backfill de una fuente nueva spamea
-    a los usuarios con miles de normas viejas. Runbook de fuente nueva:
-    backfill → `_match_all(notify=False)` → recién ahí habilitar el beat.
+    mandar digests, sin cobrar créditos y sin avisar que se agotaron — sin esto,
+    el primer backfill de una fuente nueva spamea a los usuarios con miles de
+    normas viejas. Runbook de fuente nueva: backfill → `_match_all(notify=False)`
+    → recién ahí habilitar el beat.
     """
     new_total = 0
-    # email -> (workspace_name, [items])
-    digests: dict[str, tuple[str, list[dict]]] = defaultdict(lambda: ("", []))
+    # (email, workspace_id) -> (workspace_name, plan, aporte, [items])
+    #
+    # La clave lleva el workspace y no solo el email a propósito. Antes era solo
+    # el email y el nombre del workspace se pisaba con el del último alerta
+    # procesado, así que quien está en dos workspaces recibía un mail rotulado
+    # con el equivocado. Además, sin el workspace en la clave no se sabe a quién
+    # cobrarle el digest.
+    digests: dict[tuple[str, int], tuple[str, str, dict | None, list[dict]]] = {}
+    # Ids insertados en ESTA corrida, para no marcar como notificados los de otra.
+    insertados: list[int] = []
 
     async with session_scope() as session:
         alertas = (
@@ -36,7 +51,8 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                 text(
                     """
                     SELECT a.id, a.keywords, a.sectores, a.anchor_at, a.workspace_id,
-                           w.name AS ws_name, u.email AS user_email
+                           w.name AS ws_name, w.plan AS ws_plan, w.aporte AS ws_aporte,
+                           u.email AS user_email
                     FROM alerta a
                     JOIN workspace w ON w.id = a.workspace_id
                     LEFT JOIN app_user u ON u.id = a.user_id
@@ -88,7 +104,7 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                               WHERE m.alerta_id = :aid AND m.norma_id = n.id
                           )
                         ON CONFLICT ON CONSTRAINT uq_match_alerta_norma DO NOTHING
-                        RETURNING norma_id
+                        RETURNING id, norma_id
                         """
                     ),
                     params,
@@ -98,12 +114,13 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
             if not inserted:
                 continue
             new_total += len(inserted)
+            insertados.extend(int(r[0]) for r in inserted)
             await session.execute(
                 text("UPDATE alerta SET last_match_at = now() WHERE id = :aid"), {"aid": a.id}
             )
 
             if a.user_email and notify:
-                norma_ids = [r[0] for r in inserted]
+                norma_ids = [r[1] for r in inserted]
                 normas = (
                     await session.execute(
                         text(
@@ -115,9 +132,12 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                 kw_label = ", ".join(a.keywords or []) or (
                     "sectores: " + ", ".join(a.sectores or [])
                 )
-                _, items = digests[a.user_email]
-                digests[a.user_email] = (
+                clave = (a.user_email, a.workspace_id)
+                _, _, _, items = digests.get(clave, ("", "", None, []))
+                digests[clave] = (
                     a.ws_name,
+                    a.ws_plan,
+                    a.ws_aporte,
                     items + [
                         {"id": n.id, "keyword": kw_label, "tipo": n.tipo,
                          "numero": n.numero, "titulo": n.titulo}
@@ -125,28 +145,104 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                     ],
                 )
 
-        # Marcar como notificados los matches recién insertados.
-        if new_total:
-            await session.execute(text("UPDATE alerta_match SET notified = true WHERE notified = false"))
+        # Marcar como notificados SOLO los matches de esta corrida. Antes era un
+        # UPDATE global `WHERE notified = false`, que también se llevaba puestos
+        # los que otra corrida acababa de insertar y todavía no había mandado.
+        if insertados:
+            await session.execute(
+                text("UPDATE alerta_match SET notified = true WHERE id = ANY(:ids)"),
+                {"ids": insertados},
+            )
 
-    # Enviar digests (fuera de la transacción).
-    sent = 0
-    for email, (ws_name, items) in digests.items():
+        # Saldo de cada workspace que recibiría un digest, en una sola query.
+        claves_cred = {
+            (ws_id, cred.periodo_de(plan, aporte))
+            for (_, ws_id), (_, plan, aporte, _) in digests.items()
+        }
+        usados = await cdb.leer_varios(session, sorted(claves_cred))
+
+    # Decidir a quién se le manda, antes de mandar nada. `gastado` acumula lo que
+    # se cobra en esta misma corrida: sin eso, un workspace con varios miembros
+    # leería el mismo saldo viejo para todos y se pasaría del cupo por tantos
+    # digests como gente tenga.
+    a_enviar: list[tuple[str, str, list[dict], tuple[int, str]]] = []   # email, ws_name, items, clave
+    a_avisar: list[tuple[int, str, str, str, dict]] = []      # ws_id, periodo, email, ws_name, estado
+    gastado: dict[tuple[int, str], int] = defaultdict(int)
+    omitidos = 0
+
+    for (email, ws_id), (ws_name, plan, aporte, items) in digests.items():
         if not items:
             continue
+        periodo = cred.periodo_de(plan, aporte)
+        clave = (ws_id, periodo)
+        estado = cred.estado(usados.get(clave, 0) + gastado[clave], plan, aporte)
+
+        if estado["agotados"]:
+            # Sin cupo no se manda el digest, pero los matches ya quedaron
+            # registrados y se ven en la app: se pierde el aviso, no el dato.
+            omitidos += 1
+            a_avisar.append((ws_id, periodo, email, ws_name, estado))
+            continue
+
+        a_enviar.append((email, ws_name, items, clave))
+        gastado[clave] += cred.micros_de("digest")
+
+    # Reservar los avisos ANTES de mandarlos: `tomar_aviso_agotado` es un UPDATE
+    # condicional que gana la carrera en la base. El matcher corre cada hora, y
+    # sin ese candado le llegaría un mail por hora a alguien para avisarle que
+    # dejamos de mandarle mails.
+    avisos_ganados: list[tuple[str, str, dict]] = []
+    if a_avisar:
+        async with session_scope() as session:
+            vistos: set[tuple[int, str]] = set()
+            for ws_id, periodo, email, ws_name, estado in a_avisar:
+                if (ws_id, periodo) in vistos:
+                    continue
+                vistos.add((ws_id, periodo))
+                if await cdb.tomar_aviso_agotado(session, ws_id, periodo):
+                    avisos_ganados.append((email, ws_name, estado))
+
+    # Enviar (fuera de toda transacción: una demora de Resend no puede tener
+    # abierta la transacción que escribe los matches).
+    sent = 0
+    cobros: dict[tuple[int, str], int] = defaultdict(int)
+    for email, ws_name, items, clave in a_enviar:
         subject = (
             "Vigía — 1 nueva norma para tus alertas"
             if len(items) == 1
             else f"Vigía — {len(items)} nuevas normas para tus alertas"
         )
+        resultado = send_email(to=email, subject=subject, html=render_digest(ws_name, items))
+        if resultado.get("error"):
+            continue
+        sent += 1
+        # Solo se cobra lo que Resend aceptó. Sin RESEND_API_KEY `send_email`
+        # devuelve {"skipped": True} y no sale nada: en dev el contador no se
+        # mueve, que es lo honesto.
+        if resultado.get("sent"):
+            cobros[clave] += cred.micros_de("digest")
+
+    for email, ws_name, estado in avisos_ganados:
         send_email(
             to=email,
-            subject=subject,
-            html=render_digest(ws_name, items),
+            subject="Vigía — se te acabaron los créditos de este mes",
+            html=render_sin_creditos(ws_name, estado["renueva"], estado["contacto"]),
         )
-        sent += 1
 
-    return {"new_matches": new_total, "emails": sent, "notify": notify}
+    # Cobrar al final, en una sola sesión. El aviso NO se cobra: cobrarlo sería
+    # un callejón sin salida.
+    if cobros:
+        async with session_scope() as session:
+            for (ws_id, periodo), micros in cobros.items():
+                await cdb.sumar(session, ws_id, periodo, micros)
+
+    return {
+        "new_matches": new_total,
+        "emails": sent,
+        "omitidos": omitidos,
+        "avisados": len(avisos_ganados),
+        "notify": notify,
+    }
 
 
 @celery_app.task(name="vigia_workers.alerts.match_alertas")

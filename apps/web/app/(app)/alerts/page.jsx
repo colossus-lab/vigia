@@ -7,6 +7,7 @@ import { authedFetch, AUTH_ENABLED } from '@/lib/authClient';
 import { Bell, Plus, Trash2, Power, PowerOff, Tag, Hash, Calendar, Info, Pencil, X } from 'lucide-react';
 import FadeIn from '@/components/FadeIn';
 import CountUp from '@/components/CountUp';
+import { useCreditos } from '@/components/CreditosProvider';
 
 const INPUT_CLS = 'w-full bg-transparent border-b border-border-light px-1 py-2 text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-celeste transition-colors';
 
@@ -93,7 +94,14 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
         <p className="text-[11px] font-mono mb-4 text-text-tertiary">
           {preview.count_30d === 0
             ? '≈ 0 normas en los últimos 30 días — criterio muy angosto, revisá las keywords'
-            : `≈ ${preview.count_30d.toLocaleString('es-AR')} normas en los últimos 30 días${preview.count_30d > 200 ? ' · criterio amplio, vas a recibir bastante' : ''}`}
+            : `≈ ${preview.count_30d.toLocaleString('es-AR')} normas en los últimos 30 días`}
+          {/* De normas a mails no es uno a uno: las que caen juntas en una
+              corrida viajan en el mismo digest. El backend hace la cuenta. */}
+          {preview.count_30d > 0 && preview.creditos_estimados_mes != null && (
+            <span className="text-text-secondary">
+              {' · '}≈ {preview.creditos_estimados_mes} {preview.creditos_estimados_mes === 1 ? 'mail' : 'mails'} al mes
+            </span>
+          )}
         </p>
       )}
 
@@ -178,6 +186,7 @@ export default function AlertsView() {
     }
   };
 
+  const { creditos } = useCreditos();
   const activas = alertas.filter((a) => a.activa).length;
   const totalMatches = alertas.reduce((s, a) => s + (a.matches || 0), 0);
 
@@ -185,6 +194,15 @@ export default function AlertsView() {
     { label: 'Alertas', value: alertas.length, color: 'text-text-primary' },
     { label: 'Activas', value: activas, color: 'text-status-green' },
     { label: 'Matches', value: totalMatches, color: 'text-celeste' },
+    // `disponibles === null` es el nivel pleno (sin cupo): ahí no hay número
+    // que mostrar, así que el KPI directamente no aparece.
+    ...(creditos && creditos.disponibles !== null
+      ? [{
+          label: 'Créditos',
+          value: Math.round(creditos.disponibles),
+          color: creditos.agotados ? 'text-status-red' : 'text-sol',
+        }]
+      : []),
   ];
 
   return (

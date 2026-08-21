@@ -29,6 +29,9 @@ from vigia_connectors import (
 )
 from vigia_connectors.bora import looks_like_dnu
 from vigia_connectors.emisores import detect_emisor
+from sqlalchemy import text
+
+from vigia_shared.db import session_scope
 from vigia_shared.sources import catalog_fields
 from vigia_workers.ai_resumen import aplicar_resumen_ia
 from vigia_workers.celery_app import celery_app
@@ -336,6 +339,36 @@ def _aviso_to_row(a: BoraAviso, tipo: str | None = None, texto: str | None = Non
     }
 
 
+async def _ya_resumidas(source_code: str, external_ids: list[str]) -> set[str]:
+    """Cuáles de esos avisos ya tienen `resumen_ia` en la base.
+
+    El lookback re-scrapea 5 días y la task corre 2 veces por día, así que sin
+    este filtro cada aviso se le manda al modelo ~10 veces antes de salir de la
+    ventana: medido, 297 llamadas para 58 normas nuevas. El COALESCE del upsert
+    protege el dato guardado, pero la llamada ya se pagó. Mismo patrón que
+    `societario._existing_ids`.
+    """
+    if not external_ids:
+        return set()
+    async with session_scope() as session:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT n.external_id
+                    FROM norma n
+                    JOIN source_catalog s ON s.id = n.source_id
+                    WHERE s.code = :code
+                      AND n.resumen_ia IS NOT NULL
+                      AND n.external_id = ANY(:ids)
+                    """
+                ),
+                {"code": source_code, "ids": external_ids},
+            )
+        ).scalars().all()
+    return set(rows)
+
+
 @celery_app.task(name="vigia_workers.tasks.ingest_bora_primera")
 def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: bool = True) -> dict[str, Any]:
     """Ingesta la 1ª sección del BORA (edición del día + lookback de catch-up).
@@ -396,7 +429,13 @@ def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: b
                     continue
                 # Síntesis IA (resumen_ia) desde el cuerpo del aviso, donde lo
                 # bajamos. No-op si no hay ANTHROPIC_API_KEY; nunca rompe la ingesta.
-                await aplicar_resumen_ia(rows, textos)
+                # Se saltean los que ya tienen resumen: el detalle igual se baja
+                # (hace falta para el DNU y para el resumen del feed), lo que se
+                # evita es re-pagarle al modelo por lo mismo en cada corrida.
+                ya = await _ya_resumidas(BORA_SOURCE["code"], list(textos))
+                await aplicar_resumen_ia(
+                    rows, {k: v for k, v in textos.items() if k not in ya}
+                )
                 _acc(totals, await upsert_normas(BORA_SOURCE, rows))
         if dry:
             return {"rows": totals["rows"], "sample": sample, "avisos_hoy": avisos_hoy}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Newspaper, BarChart3, Search, Bell, Shield, X, Eye, Landmark, Building2, Heart } from 'lucide-react';
+import CreditosBar from '@/components/CreditosBar';
 
 const NAV_ITEMS = [
   { to: '/feed', label: 'Feed Normativo', icon: Newspaper },
@@ -65,7 +66,8 @@ export default function Sidebar({ open, onClose }) {
           })}
           {/* Apoyar — dentro de la navegación (no en el pie) y separado de las
               secciones de datos, para que se vea sin scrollear. */}
-          <div className="pt-2 mt-2 border-t border-border-light">
+          <div className="pt-2 mt-2 border-t border-border-light space-y-2">
+            <CreditosBar />
             <Link
               href="/apoyar"
               onClick={onClose}

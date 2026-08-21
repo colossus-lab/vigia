@@ -78,7 +78,8 @@ const SECCIONES = [
     cuerpo: [
       <>Vigía está en <strong className="text-text-primary">beta</strong> y se ofrece "tal cual". Hacemos lo posible por la frescura y fidelidad de los datos (monitoreamos cada fuente con SLOs), pero las fuentes oficiales pueden contener errores, demoras u omisiones — y nuestro procesamiento también puede fallar.</>,
       <>Vigía <strong className="text-text-primary">no es asesoramiento legal</strong>. Los resúmenes — incluidos los generados automáticamente con IA — son orientativos: ante cualquier decisión, verificá siempre el texto completo en la fuente oficial (cada norma incluye el link).</>,
-      <>Vigía es <strong className="text-text-primary">gratuito</strong>: no hay período de prueba ni funciones pagas. Se sostiene con aportes voluntarios (ver <Link href="/apoyar" className="textlink">Apoyar</Link>), que no destraban nada — todas las funciones están disponibles para todos, y los datos normativos públicos son de libre acceso.</>,
+      <>Vigía es <strong className="text-text-primary">gratuito</strong>: no hay período de prueba ni funciones pagas, y el corpus normativo —búsqueda, lectura, estadísticas— es de libre acceso, sin medición y sin necesidad de cuenta. Se sostiene con aportes voluntarios (ver <Link href="/apoyar" className="textlink">Apoyar</Link>).</>,
+      <>Lo único que lleva un cupo mensual son <strong className="text-text-primary">los emails de alerta</strong>, porque son el único costo que depende de cada persona. Al agotarse, las alertas siguen registrando las coincidencias y podés consultarlas en la plataforma; solo se pausan los envíos hasta el período siguiente. Un aporte voluntario amplía ese cupo, y si no podés aportar podemos ampliarlo igual a pedido: escribinos a <a href="mailto:devops@colossuslab.org" className="textlink">devops@colossuslab.org</a>.</>,
     ],
   },
   {
