@@ -30,18 +30,32 @@ from vigia_connectors._http import get_text, make_client
 BORA_BASE = "https://www.boletinoficial.gob.ar"
 USER_AGENT = "vigia/0.1 (+https://vigia.openarg.org)"
 
-# El listado sirve como máximo 100 avisos por sección y fecha, y el HTML NO trae
-# paginación: verificado 2026-09-10, no hay `data-page`, ni "ver más", ni
-# `totalItems` en el markup. O sea que en las ediciones pesadas perdemos la cola
-# sin que nada falle. Medido ese día sobre la 1ª sección del 2026-09-08: el
-# listado devolvió 100 avisos (IDs 347019→347118), pero los IDs siguientes
-# existían para esa misma fecha hasta ~347265 — o sea ~247 avisos reales, 100
-# ingeridos. La 2ª sección pega el tope TODOS los días hábiles.
+# `/seccion/{s}/{fecha}` server-renderiza solo los primeros 100 avisos; el resto
+# entra por scroll infinito, así que `fetch_seccion` (un GET) ingiere ediciones
+# incompletas sin que nada falle. Medido 2026-09-10 recorriendo la paginación:
 #
-# Resolverlo requiere otra vía de acceso (recorrido por rango de ID del día, o
-# el buscador del sitio). Hasta entonces, lo mínimo es que deje de ser
-# silencioso: `listado_truncado` es la señal que las tasks suben a
-# /health/sources en vez de reportar "ok" sobre una edición incompleta.
+#   1ª 2026-09-08: 124 reales, ingeridos 100 (falta 19%)
+#   1ª 2026-09-01: 129 reales, ingeridos 100 (falta 22%)
+#   2ª 2026-09-09: 468 reales, ingeridos 100 (falta 78%)
+#
+# La 1ª sección solo pega el tope en las ediciones pesadas (2 de las últimas 31);
+# la 2ª lo pega TODOS los días hábiles.
+#
+# Cómo se pagina (por si alguien lo arregla): GET
+# `/seccion/actualizar/{seccion}?pag=N&ult_rubro=...`, con la cookie de sesión
+# que deja el GET del listado — la fecha NO viaja en la query, la toma de la
+# sesión. Devuelve JSON `{html, hay_mas_datos, sig_pag, ult_rubro}`: se itera
+# mientras `hay_mas_datos`, arrastrando `ult_rubro` (arranca en la var JS
+# `ultimoRubro` del listado) porque los rubros son headers posicionales.
+#
+# OJO con verificar esto por IDs: `/detalleAviso/{s}/{id}/{fecha}` **ignora la
+# fecha de la URL** y sirve el aviso igual, así que probar IDs correlativos NO
+# dice cuántos avisos tuvo un día (así se sobreestimó el faltante de la 1ª en
+# ~60% cuando es ~20%). El único conteo confiable es recorrer la paginación.
+#
+# Hasta que se pagine, lo mínimo es que deje de ser silencioso:
+# `listado_truncado` es la señal que las tasks suben a /health/sources en vez de
+# reportar "ok" sobre una edición incompleta.
 LISTADO_TOPE = 100
 
 # "Decreto 436/2026" -> (tipo, numero). El número puede no estar (p.ej. "Fe de erratas").
