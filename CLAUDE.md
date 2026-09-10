@@ -110,17 +110,25 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **NextAuth v5-beta + Next 16**: known issue con `headers()` async al activar OAuth real — puede requerir bump de next-auth (documentado en `../investarg`).
 - **Preview/screenshots en dev**: el cliente next-auth + TypingDemo impiden el "network idle" — verificar por DOM (`preview_eval`) en vez de screenshot.
 - **BORA**: sin API — scrape del HTML server-rendered (`/seccion/{seccion}/{yyyymmdd}` + detalle `#cuerpoDetalleAviso`). IDs de 2ª sección alfanuméricos (`A1500779`); los rubros son headers `h5.seccion-rubro` intercalados (se trackean posicionalmente). Los DNU salen como "Decreto": se promueven mirando el texto del detalle (art. 99 inc. 3).
-- **El listado del BORA corta en 100 avisos por sección y fecha**, y el HTML no
-  trae paginación (ni `data-page`, ni "ver más", ni `totalItems` — verificado
-  2026-09-10). O sea que las ediciones pesadas se ingieren incompletas sin que
-  nada falle. Medido en la 1ª sección del 2026-09-08: el listado dio 100 avisos
-  (IDs 347019→347118) y los IDs siguientes existían igual para esa fecha hasta
-  ~347265, o sea ~247 reales. La **2ª sección pega el tope todos los días
-  hábiles** (por eso `avisos/stats` da números redondos: 100/día exactos).
-  Todavía no está resuelto —hace falta otra vía de acceso, recorrido por rango
-  de ID del día o el buscador del sitio—, pero **ya no es silencioso**:
-  `listado_truncado()` marca la fuente en `warn` con el detalle de qué ediciones
-  quedaron cortadas.
+- **El listado del BORA corta en 100 avisos por sección y fecha** (el resto
+  entra por scroll infinito), así que `fetch_seccion` ingiere ediciones
+  incompletas sin que nada falle. Medido 2026-09-10 recorriendo la paginación:
+  1ª del 08/09 → 124 reales / 100 ingeridos; 1ª del 01/09 → 129/100; **2ª del
+  09/09 → 468 reales / 100 ingeridos (falta 78%)**. La 1ª solo pega el tope en
+  ediciones pesadas (2 de las últimas 31); la **2ª lo pega todos los días
+  hábiles** — por eso `avisos/stats` da números redondos (100/día exactos).
+  Todavía no está resuelto, pero **ya no es silencioso**: `listado_truncado()`
+  marca la fuente en `warn` diciendo qué ediciones quedaron cortadas.
+- **Para paginar el listado del BORA**: GET
+  `/seccion/actualizar/{seccion}?pag=N&ult_rubro=...` con la cookie de sesión
+  que deja el GET del listado (la fecha **no** va en la query: sale de la
+  sesión). Devuelve `{html, hay_mas_datos, sig_pag, ult_rubro}`; se itera
+  mientras `hay_mas_datos` arrastrando `ult_rubro`, que arranca en la var JS
+  `ultimoRubro` del listado — hace falta porque los rubros son headers
+  posicionales. **No medir la completitud probando IDs correlativos**:
+  `/detalleAviso/{s}/{id}/{fecha}` ignora la fecha de la URL y devuelve el aviso
+  igual, así que los IDs no dicen nada sobre cuántos avisos tuvo un día (así se
+  sobreestimó el faltante de la 1ª en ~60% cuando es ~20%).
 - **`warn` no es `stale`, y ahora se ve**: los guards de ingesta escriben
   `last_status='warn'` para cosas ciertas pero permanentes (el tope de 100 pasa
   todos los días en la 2ª sección). Meterlas en `stale` dejaría la fuente en rojo
