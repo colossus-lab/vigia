@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Clock, ArrowRight, Building2, Tag } from 'lucide-react';
 import { TIPOS_NORMA } from '@/lib/constants';
+import { pluralizarTipo } from '@/lib/plural';
 
 export const TIPO_TINT = {
   DNU: 'tint-red', DECRETO: 'tint-amber', LEY: 'tint-green', RESOLUCION: 'tint-blue',
@@ -82,7 +83,7 @@ export function resumenEdicion(ed) {
     .filter(([t]) => t !== 'OTRA')
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
-    .map(([t, c]) => `${c} ${(TIPOS_NORMA[t]?.label || t).toLowerCase()}${c !== 1 ? (t === 'LEY' ? 'es' : 's') : ''}`);
+    .map(([t, c]) => `${c} ${pluralizarTipo(t, (TIPOS_NORMA[t]?.label || t).toLowerCase(), c)}`);
   return partes.join(' · ');
 }
 
