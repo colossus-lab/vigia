@@ -19,11 +19,11 @@ from typing import Any
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import insert
 
-from vigia_connectors import BoraClient
+from vigia_connectors import LISTADO_TOPE, BoraClient, listado_truncado
 from vigia_shared.db import session_scope
 from vigia_shared.models import AvisoSocietario
 from vigia_workers.celery_app import celery_app
-from vigia_workers.persistence import ensure_source, run_async, with_status
+from vigia_workers.persistence import ensure_source, mark_source_run, run_async, with_status
 
 _BATCH = 500
 
@@ -73,10 +73,13 @@ def ingest_bora_segunda(dry_run: bool = False, lookback_days: int = 3) -> dict[s
         total = 0
         con_texto = 0
         sample: list[dict[str, Any]] = []
+        truncadas: list[str] = []
         existentes = set() if dry else await _existing_ids(fechas)
         async with BoraClient() as client:
             for fecha in fechas:
                 avisos = await client.fetch_seccion("segunda", fecha)
+                if listado_truncado(avisos):
+                    truncadas.append(fecha.isoformat())
                 if not avisos:
                     continue
                 nuevos = [a for a in avisos if a.aviso_id not in existentes]
@@ -113,7 +116,7 @@ def ingest_bora_segunda(dry_run: bool = False, lookback_days: int = 3) -> dict[s
                     )
                     continue
                 await _upsert(rows)
-        out: dict[str, Any] = {"rows": total, "con_texto": con_texto}
+        out: dict[str, Any] = {"rows": total, "con_texto": con_texto, "truncadas": truncadas}
         if dry:
             out["sample"] = sample
         return out
@@ -127,4 +130,25 @@ def ingest_bora_segunda(dry_run: bool = False, lookback_days: int = 3) -> dict[s
         counts = await with_status(["bora_segunda"], _run)
         return {"source": "bora_segunda", **counts}
 
-    return run_async(_wrapped())
+    result = run_async(_wrapped())
+
+    # Acá el truncamiento no es la excepción: la 2ª sección publica ~200-400
+    # avisos por día y el listado corta en 100, así que esto va a quedar en warn
+    # todos los días hábiles hasta que haya paginación. Es a propósito — la
+    # fuente ESTÁ incompleta todos los días y hasta ahora reportaba "ok".
+    # `warn` no dispara el mail de ops (freshness.py solo escala `error`) ni
+    # marca la fuente como stale: queda como motivo visible en /health/sources.
+    truncadas = result.get("truncadas") or []
+    if truncadas:
+        run_async(
+            mark_source_run(
+                "bora_segunda",
+                status="warn",
+                error=(
+                    f"listado truncado en el tope de {LISTADO_TOPE} avisos: "
+                    f"{len(truncadas)} de {len(fechas)} ediciones ({', '.join(truncadas)}) — "
+                    "la 2ª sección publica bastante más que eso por día"
+                ),
+            )
+        )
+    return result

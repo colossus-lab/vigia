@@ -27,7 +27,7 @@ from vigia_connectors import (
     BoCabaClient, BoCabaNorma, BoPbaClient, BoPbaNorma, BoraAviso, BoraClient,
     HcdnClient, HcdnProyecto, InfoLegClient, InfoLegNorm, SenadoClient, SenadoProyecto,
 )
-from vigia_connectors.bora import looks_like_dnu
+from vigia_connectors.bora import LISTADO_TOPE, listado_truncado, looks_like_dnu
 from vigia_connectors.emisores import detect_emisor
 from sqlalchemy import text
 
@@ -389,11 +389,14 @@ def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: b
         totals = _empty_totals()
         sample: list[dict[str, Any]] = []
         avisos_hoy = 0
+        truncadas: list[str] = []
         async with BoraClient() as client:
             for fecha in fechas:
                 avisos = await client.fetch_seccion("primera", fecha)
                 if fecha == hoy:
                     avisos_hoy = len(avisos)
+                if listado_truncado(avisos):
+                    truncadas.append(fecha.isoformat())
                 if not avisos:
                     continue
                 # Detalle: para decretos (detección de DNU) y para avisos sin
@@ -438,8 +441,13 @@ def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: b
                 )
                 _acc(totals, await upsert_normas(BORA_SOURCE, rows))
         if dry:
-            return {"rows": totals["rows"], "sample": sample, "avisos_hoy": avisos_hoy}
-        return {**totals, "avisos_hoy": avisos_hoy}
+            return {
+                "rows": totals["rows"],
+                "sample": sample,
+                "avisos_hoy": avisos_hoy,
+                "truncadas": truncadas,
+            }
+        return {**totals, "avisos_hoy": avisos_hoy, "truncadas": truncadas}
 
     if dry:
         result = run_async(_run())
@@ -451,15 +459,23 @@ def ingest_bora_primera(dry_run: bool = False, lookback_days: int = 5, notify: b
 
     result = run_async(_wrapped())
 
-    # Guard: día hábil sin avisos = probable cambio de HTML (el parser devolvió
-    # vacío sin error). Queda visible en /health/sources.
+    # Guards de falla silenciosa. `with_status` deja last_status='ok' apenas la
+    # corrida no explota, así que sin esto los dos modos en que el BORA nos
+    # miente —parser vacío y listado truncado— pasan por una ingesta sana.
+    # Ambos terminan en /health/sources como warn + motivo.
+    problemas: list[str] = []
     if result.get("avisos_hoy", 0) == 0 and hoy.weekday() < 5:
+        problemas.append("0 avisos en día hábil — ¿feriado o cambió el HTML del listado?")
+    truncadas = result.get("truncadas") or []
+    if truncadas:
+        problemas.append(
+            f"listado truncado en el tope de {LISTADO_TOPE} avisos: "
+            f"{len(truncadas)} de {len(fechas)} ediciones ({', '.join(truncadas)}) — "
+            "falta la cola de esas fechas"
+        )
+    if problemas:
         run_async(
-            mark_source_run(
-                BORA_SOURCE["code"],
-                status="warn",
-                error="0 avisos en día hábil — ¿feriado o cambió el HTML del listado?",
-            )
+            mark_source_run(BORA_SOURCE["code"], status="warn", error=" | ".join(problemas))
         )
 
     # Dedup contra InfoLEG + matching de alertas (frescura inmediata).

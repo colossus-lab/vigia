@@ -45,6 +45,21 @@ async def health_detailed() -> dict:
     }
 
 
+def _warnings(row) -> list[str]:
+    """Avisos que la task dejó sin que la fuente esté rota ni estancada.
+
+    Van aparte de `stale_reasons` a propósito. Los guards de ingesta escriben
+    `last_status='warn'` para cosas que son ciertas pero permanentes —el listado
+    del BORA truncado en 100 pasa TODOS los días en la 2ª sección— y meterlas en
+    `stale` dejaría a la fuente en rojo fijo, que es la forma más rápida de que
+    nadie vuelva a mirar el endpoint. Hasta ahora estos motivos no se veían en
+    ningún lado: se escribían en `last_error` y `_stale_reasons` los filtraba.
+    """
+    if row.last_status == "warn" and row.last_error:
+        return [str(row.last_error)[:300]]
+    return []
+
+
 def _stale_reasons(src_def: dict | None, row, now: datetime, today: date) -> list[str]:
     """Misma semántica que vigia_workers.freshness, para consulta sin ssh."""
     reasons: list[str] = []
@@ -101,6 +116,7 @@ async def health_sources() -> dict:
     for r in rows:
         seen.add(r.code)
         reasons = _stale_reasons(SOURCES.get(r.code), r, now, today)
+        warns = _warnings(r)
         out.append(
             {
                 "code": r.code,
@@ -113,6 +129,7 @@ async def health_sources() -> dict:
                 "max_fecha_publicacion": r.max_fecha.isoformat() if r.max_fecha else None,
                 "stale": bool(reasons),
                 "stale_reasons": reasons or None,
+                "warnings": warns or None,
             }
         )
     # Fuentes esperadas que todavía no corrieron nunca.
@@ -130,6 +147,7 @@ async def health_sources() -> dict:
                     "max_fecha_publicacion": None,
                     "stale": True,
                     "stale_reasons": ["nunca corrió"],
+                    "warnings": None,
                 }
             )
     return {"status": "ok", "sources": out}
