@@ -5,7 +5,9 @@ from datetime import date
 from pathlib import Path
 
 from vigia_connectors.bora import (
+    LISTADO_TOPE,
     BoraAviso,
+    listado_truncado,
     looks_like_dnu,
     parse_detalle_texto,
     parse_seccion_html,
@@ -64,3 +66,37 @@ def test_tipo_slug_dnu_explicito():
     )
     assert a.tipo_slug() == "DNU"
     assert a.numero == "70/2026"
+
+
+def _listado_de(n: int) -> str:
+    """Listado sintético de n avisos, con el markup real del sitio."""
+    filas = "".join(
+        f'''<a href="/detalleAviso/primera/{347000 + i}/20260908">
+             <p class="item">ORGANISMO {i}</p>
+             <p class="item-detalle">Resolución {i}/2026</p>
+             <p class="item-detalle">Sumario del aviso {i}.</p>
+           </a>'''
+        for i in range(n)
+    )
+    return f'<html><body><h5 class="seccion-rubro">RESOLUCIONES</h5>{filas}</body></html>'
+
+
+def test_listado_truncado_detecta_el_tope():
+    """El sitio corta en 100 y no pagina: una edición de 100 está incompleta.
+
+    Regresión del 2026-09-08, cuando la 1ª sección listó 100 avisos y los IDs
+    posteriores existían igual para esa fecha (~247 reales).
+    """
+    completo = parse_seccion_html(_listado_de(LISTADO_TOPE - 1), "primera", date(2026, 9, 8))
+    assert len(completo) == LISTADO_TOPE - 1
+    assert listado_truncado(completo) is False
+
+    tope = parse_seccion_html(_listado_de(LISTADO_TOPE), "primera", date(2026, 9, 8))
+    assert len(tope) == LISTADO_TOPE
+    assert listado_truncado(tope) is True
+
+
+def test_listado_truncado_no_marca_ediciones_chicas():
+    """Los días normales del BORA (30-90 avisos) no pueden disparar el warn."""
+    assert listado_truncado(_avisos()) is False
+    assert listado_truncado([]) is False

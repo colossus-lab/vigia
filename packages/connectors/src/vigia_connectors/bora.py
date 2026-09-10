@@ -30,6 +30,20 @@ from vigia_connectors._http import get_text, make_client
 BORA_BASE = "https://www.boletinoficial.gob.ar"
 USER_AGENT = "vigia/0.1 (+https://vigia.openarg.org)"
 
+# El listado sirve como máximo 100 avisos por sección y fecha, y el HTML NO trae
+# paginación: verificado 2026-09-10, no hay `data-page`, ni "ver más", ni
+# `totalItems` en el markup. O sea que en las ediciones pesadas perdemos la cola
+# sin que nada falle. Medido ese día sobre la 1ª sección del 2026-09-08: el
+# listado devolvió 100 avisos (IDs 347019→347118), pero los IDs siguientes
+# existían para esa misma fecha hasta ~347265 — o sea ~247 avisos reales, 100
+# ingeridos. La 2ª sección pega el tope TODOS los días hábiles.
+#
+# Resolverlo requiere otra vía de acceso (recorrido por rango de ID del día, o
+# el buscador del sitio). Hasta entonces, lo mínimo es que deje de ser
+# silencioso: `listado_truncado` es la señal que las tasks suben a
+# /health/sources en vez de reportar "ok" sobre una edición incompleta.
+LISTADO_TOPE = 100
+
 # "Decreto 436/2026" -> (tipo, numero). El número puede no estar (p.ej. "Fe de erratas").
 _TIPO_NUM_RE = re.compile(r"^\s*(?P<tipo>[A-Za-zÁÉÍÓÚÑáéíóúñü.\s]+?)\s*(?P<numero>\d[\d./-]*)?\s*$")
 
@@ -182,3 +196,15 @@ class BoraClient:
                 self._client, f"/detalleAviso/{aviso.seccion}/{aviso.aviso_id}/{aviso.fecha:%Y%m%d}"
             )
         return parse_detalle_texto(html)
+
+
+def listado_truncado(avisos: list[BoraAviso]) -> bool:
+    """True si el listado de esa fecha pegó el tope del sitio (faltan avisos).
+
+    Es un piso, no un conteo exacto: `parse_seccion_html` dedupea por `aviso_id`
+    (los links ``?anexos=1`` repiten el mismo aviso), así que si una edición
+    truncada trajera duplicados el parseo podría quedar en 99 y no disparar.
+    Preferimos ese falso negativo raro antes que un umbral más flojo que
+    empiece a marcar ediciones sanas: como señal de warn, subestimar es barato.
+    """
+    return len(avisos) >= LISTADO_TOPE

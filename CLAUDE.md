@@ -110,6 +110,26 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **NextAuth v5-beta + Next 16**: known issue con `headers()` async al activar OAuth real — puede requerir bump de next-auth (documentado en `../investarg`).
 - **Preview/screenshots en dev**: el cliente next-auth + TypingDemo impiden el "network idle" — verificar por DOM (`preview_eval`) en vez de screenshot.
 - **BORA**: sin API — scrape del HTML server-rendered (`/seccion/{seccion}/{yyyymmdd}` + detalle `#cuerpoDetalleAviso`). IDs de 2ª sección alfanuméricos (`A1500779`); los rubros son headers `h5.seccion-rubro` intercalados (se trackean posicionalmente). Los DNU salen como "Decreto": se promueven mirando el texto del detalle (art. 99 inc. 3).
+- **El listado del BORA corta en 100 avisos por sección y fecha**, y el HTML no
+  trae paginación (ni `data-page`, ni "ver más", ni `totalItems` — verificado
+  2026-09-10). O sea que las ediciones pesadas se ingieren incompletas sin que
+  nada falle. Medido en la 1ª sección del 2026-09-08: el listado dio 100 avisos
+  (IDs 347019→347118) y los IDs siguientes existían igual para esa fecha hasta
+  ~347265, o sea ~247 reales. La **2ª sección pega el tope todos los días
+  hábiles** (por eso `avisos/stats` da números redondos: 100/día exactos).
+  Todavía no está resuelto —hace falta otra vía de acceso, recorrido por rango
+  de ID del día o el buscador del sitio—, pero **ya no es silencioso**:
+  `listado_truncado()` marca la fuente en `warn` con el detalle de qué ediciones
+  quedaron cortadas.
+- **`warn` no es `stale`, y ahora se ve**: los guards de ingesta escriben
+  `last_status='warn'` para cosas ciertas pero permanentes (el tope de 100 pasa
+  todos los días en la 2ª sección). Meterlas en `stale` dejaría la fuente en rojo
+  fijo y nadie volvería a mirar el endpoint, así que `/health/sources` las
+  expone en un campo `warnings` aparte y `stale` sigue significando lo mismo.
+  Ojo con el bug que esto arregla: `_stale_reasons` solo mostraba `last_error`
+  para `error`/`stale`, así que el guard de "0 avisos en día hábil" venía
+  guardando su motivo **sin mostrarlo en ningún lado** desde que se escribió.
+  `warn` tampoco manda mail: `freshness.py` solo escala `error`.
 - **Dedup BORA↔InfoLEG**: `reconcile_bora_infoleg` borra la fila BORA cuando llega la gemela InfoLEG, trasplantando antes los `alerta_match` con `notified=true` (anti doble-notificación). Solo LEY/DECRETO/DNU, con guard de instrumento (las Decisiones Administrativas numeran aparte).
 - **Orden de beats importa**: `ingest_hcdn_proyectos` (08:00) pisa `norma.estado` a diario; `ingest_hcdn_movimientos` (08:30) lo re-deriva. No invertirlos.
 - **Fuentes nuevas**: runbook en `infra/DEPLOY.md` (dry-run → backfill → `match_alertas(notify=False)` → beat). Registry con SLOs en `vigia_shared/sources.py`; estado operativo sin ssh en `GET /health/sources`.
