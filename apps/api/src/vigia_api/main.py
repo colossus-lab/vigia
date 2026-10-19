@@ -12,6 +12,7 @@ from vigia_api.routers import (
     api_keys,
     auth,
     avisos,
+    congreso,
     health,
     invitations,
     normas,
@@ -42,7 +43,7 @@ if _sentry_dsn:
 # Prefijos de datos públicos (CLAUDE.md: los endpoints de datos son públicos
 # SIEMPRE; el gating aplica solo a /workspaces, /invitations, /alerts, /account).
 # Solo estos llevan Cache-Control: nada con sesión se cachea.
-_CACHEABLE_PREFIXES = ("/normas", "/stats", "/avisos", "/search")
+_CACHEABLE_PREFIXES = ("/normas", "/stats", "/avisos", "/search", "/congreso")
 _CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=600"
 
 # `/v1` queda deliberadamente FUERA de la lista: es la superficie de
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(search.router)
     app.include_router(stats.router)
     app.include_router(avisos.router)
+    app.include_router(congreso.router)
     # API pública versionada. Último a propósito: los routers internos ya
     # ocuparon sus prefijos y `/v1` no puede pisarlos ni al revés.
     app.include_router(v1.router)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -43,6 +44,11 @@ class NormaDetail(NormaBase):
     fuente_code: str | None = None
     # Timeline de tramitación (PROYECTO): últimos movimientos HCDN, de raw.
     movimientos: list[dict] | None = None
+    # Cruce con el Congreso por expediente (votaciones, asuntos tratados y
+    # reuniones de comisión). El shape lo define `routers/congreso.py`
+    # (`CongresoDeNorma`) y el contrato `docs/congreso-api.md`; acá va como dict
+    # porque los modelos del Congreso viven en la API. None sin cruce.
+    congreso: dict[str, Any] | None = None
 
 
 class NormaPage(BaseModel):
