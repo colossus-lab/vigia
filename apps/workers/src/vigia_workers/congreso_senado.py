@@ -315,27 +315,31 @@ async def _asegurar_legisladores(minimos: dict[str, dict[str, Any]]) -> dict[str
 
 
 async def _vincular_sesiones() -> int:
-    """`votacion.sesion_id` por fecha. La fecha del acta es la de la sesión
-    (aunque la votación sea de madrugada), así que alcanza con el día.
+    """`votacion.sesion_id` por fecha. La fecha del acta casi siempre es la de
+    la sesión (aunque la votación sea de madrugada), así que alcanza con el día.
 
-    Si ese día hubo más de una sesión gana la que no es asamblea ni juicio
-    político, y después la de número de reunión más alto (la última del día).
+    Casi: hay sesiones que cruzan la medianoche con el acta fechada al día
+    siguiente (el SIPA, sesión del 20/11/2008, actas del 21/11). Por eso, si ese
+    día no hubo sesión, vale la del día anterior. Si hubo más de una, gana la
+    del mismo día, después la que no es asamblea ni juicio político y después
+    la de número de reunión más alto (la última del día).
     """
     async with session_scope() as session:
         res = await session.execute(text("""
-            UPDATE votacion v SET sesion_id = (
-                SELECT s.id FROM congreso_sesion s
-                WHERE s.camara = v.camara
-                  AND s.fecha = (v.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-                ORDER BY (s.tipo ILIKE ANY(:secundarias)), s.reunion DESC NULLS LAST
-                LIMIT 1
+            WITH dia AS (
+                SELECT v.id, (v.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires')::date AS d
+                FROM votacion v
+                WHERE v.camara = :c AND v.sesion_id IS NULL
+            ), elegida AS (
+                SELECT DISTINCT ON (dia.id) dia.id AS votacion_id, s.id AS sesion_id
+                FROM dia
+                JOIN congreso_sesion s
+                  ON s.camara = :c AND s.fecha BETWEEN dia.d - 1 AND dia.d
+                ORDER BY dia.id, (s.fecha = dia.d) DESC,
+                         (s.tipo ILIKE ANY(:secundarias)), s.reunion DESC NULLS LAST
             )
-            WHERE v.camara = :c AND v.sesion_id IS NULL
-              AND EXISTS (
-                SELECT 1 FROM congreso_sesion s
-                WHERE s.camara = v.camara
-                  AND s.fecha = (v.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-              )
+            UPDATE votacion v SET sesion_id = e.sesion_id
+            FROM elegida e WHERE v.id = e.votacion_id
         """), {"c": _CAMARA, "secundarias": ["ASAMBLEA%", "TRIBUNAL%"]})
         return res.rowcount or 0
 
