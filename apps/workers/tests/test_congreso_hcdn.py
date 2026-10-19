@@ -126,3 +126,21 @@ def test_bajas_agenda_parametros():
     # Días con solo sesión de recinto: no quedó ninguna reunión de comisión,
     # así que las futuras de esos días se dan de baja.
     assert bajas_agenda([date(2026, 10, 21)], [], ahora)["ids"] == []
+
+
+def test_bajas_agenda_cubre_los_dias_sin_encabezado():
+    # El jueves tenía una sola reunión y se suspendió: el jueves desaparece de la
+    # página. Igual está cubierto, porque la agenda llega hasta el viernes.
+    ahora = datetime(2026, 10, 20, 9, 0, tzinfo=ART)  # martes
+    p = bajas_agenda([date(2026, 10, 20), date(2026, 10, 23)], ["1"], ahora)
+    assert p["dias"] == [date(2026, 10, d) for d in (20, 21, 22, 23)]
+
+
+def test_bajas_agenda_no_toca_el_pasado_ni_lo_que_la_pagina_no_muestra():
+    ahora = datetime(2026, 10, 20, 9, 0, tzinfo=ART)
+    # La página muestra la semana entera, incluidos días que ya pasaron: el
+    # rango arranca hoy y termina en el último día mostrado (no después).
+    p = bajas_agenda([date(2026, 10, 19), date(2026, 10, 21)], [], ahora)
+    assert p["dias"] == [date(2026, 10, 20), date(2026, 10, 21)]
+    # Una agenda que solo trae días pasados no cubre nada futuro.
+    assert bajas_agenda([date(2026, 10, 19)], [], ahora) is None

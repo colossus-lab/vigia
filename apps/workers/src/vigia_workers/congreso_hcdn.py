@@ -451,10 +451,20 @@ def bajas_agenda(dias: list[date], ids: list[str], ahora: datetime) -> dict[str,
 
     Sin `dias` la página vino rota o vacía (eso ya lo avisa el warn de agenda
     vacía): no se interpreta como "se suspendió todo".
+
+    Los días cubiertos son TODOS los que van de hoy al último que muestra la
+    página, no solo los que tienen encabezado: un día cuya única reunión se
+    suspendió desaparece de la agenda, y si contáramos solo los que figuran, la
+    suspendida quedaría para siempre. Lo posterior al último día no se toca.
     """
     if not dias:
         return None
-    return {"c": CAMARA, "ahora": ahora, "dias": sorted(set(dias)), "ids": sorted(set(ids))}
+    hoy = ahora.astimezone(ART).date()
+    fin = max(dias)
+    if fin < hoy:
+        return None
+    cubiertos = [hoy + timedelta(days=i) for i in range((fin - hoy).days + 1)]
+    return {"c": CAMARA, "ahora": ahora, "dias": cubiertos, "ids": sorted(set(ids))}
 
 
 async def _ingest_agenda(dry: bool) -> dict[str, Any]:
