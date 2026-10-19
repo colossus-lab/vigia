@@ -164,7 +164,9 @@ futuras de la agenda **no** entran (para eso está `/agenda`).
 ```json
 "congreso": {
   "votaciones": [ /* ítems de /votaciones, como mucho 20, fecha DESC */ ],
-  "asuntos":    [ /* asuntos tratados con la fecha de su sesión */ ],
+  "asuntos":    [ /* ítems de /sesiones/{id}.asuntos, más la sesión:
+                     "sesion_id": 1811, "fecha": "2026-10-07", "camara": "D".
+                     Orden: fecha DESC */ ],
   "reuniones":  [ /* reuniones de agenda, las próximas primero */ ]
 }
 ```
