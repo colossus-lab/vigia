@@ -20,6 +20,10 @@ from vigia_workers.tasks import (
 )
 
 EXPECTED_KEYS = set(_NORMA_UPDATE_COLS) | {"external_id"}
+# Los mappers de proyectos suman `expedientes` (llave del cruce con el Congreso).
+# `upsert_normas` la actualiza solo si el batch la trae, así que las demás
+# fuentes no la mandan y no pisan lo que llenó el backfill.
+EXPECTED_PROYECTO_KEYS = EXPECTED_KEYS | {"expedientes"}
 
 
 def test_senado_to_row_shape():
@@ -29,7 +33,8 @@ def test_senado_to_row_shape():
         fecha=date(2026, 6, 12), autores=["Valenzuela Mercedes Gabriela"],
     )
     row = _senado_to_row(p)
-    assert set(row.keys()) == EXPECTED_KEYS
+    assert set(row.keys()) == EXPECTED_PROYECTO_KEYS
+    assert row["expedientes"] == ["1040-S-2026"]
     assert row["tipo"] == "PROYECTO"
     assert row["external_id"] == "1040/26-S-PL"
     assert row["numero"] == "1040/26"
@@ -75,11 +80,23 @@ def test_proyecto_to_row_shape():
         autor="PEREZ, Juan",
     )
     row = _proyecto_to_row(p)
-    assert set(row.keys()) == EXPECTED_KEYS
+    assert set(row.keys()) == EXPECTED_PROYECTO_KEYS
+    assert row["expedientes"] == ["2561-D-2026"]
     assert row["tipo"] == "PROYECTO"
     assert row["numero"] == "2561-D-2026"
     assert row["estado"] == "En trámite"
     assert row["tags"] == ["ley"]
+
+
+def test_proyecto_con_expediente_en_cada_camara():
+    # Un proyecto del Ejecutivo que entró por Diputados y pasó al Senado: los
+    # dos expedientes van al array, así cruza con votaciones de ambas cámaras.
+    p = HcdnProyecto(
+        proyecto_id="HCDN300000", titulo="T", fecha_publicacion=date(2026, 3, 1),
+        camara_origen="Diputados", exp_diputados="0010-PE-2026", exp_senado="CD-12/26",
+        tipo_proyecto="LEY", autor=None,
+    )
+    assert _proyecto_to_row(p)["expedientes"] == ["0010-PE-2026", "0012-CD-2026"]
 
 
 def test_aviso_to_row_shape():

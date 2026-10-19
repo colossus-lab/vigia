@@ -34,7 +34,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -81,6 +81,7 @@ class Norma(Base):
         Index("ix_norma_tipo_sector", "tipo", "sector"),
         Index("ix_norma_emisor", "emisor"),
         Index("ix_norma_impacto", "impacto"),
+        Index("ix_norma_expedientes", "expedientes", postgresql_using="gin"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -108,6 +109,12 @@ class Norma(Base):
     tags: Mapped[list[str] | None] = mapped_column(JSONB)
     url: Mapped[str | None] = mapped_column(String(1024))
     raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # Expedientes del Congreso en forma canónica (`vigia_shared.expedientes`),
+    # uno por cámara. Solo los PROYECTO lo llenan; es la llave del cruce con
+    # votaciones, sesiones y agenda (GIN, migración 0012).
+    expedientes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, server_default=text("'{}'")
+    )
 
     # Columna generada (ver migración). Solo-lectura desde el ORM.
     search_vector: Mapped[Any | None] = mapped_column(TSVECTOR)
@@ -176,6 +183,200 @@ class DnuTracking(Base):
     )
 
     norma: Mapped[Norma] = relationship(back_populates="dnu_tracking")
+
+
+# ───────────────────────── Congreso (migración 0012) ─────────────────────────
+#
+# Lo que PASA en el Congreso, separado de `norma` (que tiene los papeles: los
+# proyectos). El cruce con los proyectos es por `expedientes` (text[] canónico,
+# GIN en las dos puntas, solapamiento con `&&`). `camara`: 'S' Senado | 'D' Diputados.
+
+
+class Legislador(Base):
+    """Senador/a o diputado/a. `external_id` es el id de su cámara (el del Senado
+    es el mismo que aparece en las filas de voto de cada acta)."""
+
+    __tablename__ = "legislador"
+    __table_args__ = (
+        CheckConstraint("camara IN ('S', 'D')", name="ck_legislador_camara"),
+        UniqueConstraint("camara", "external_id", name="uq_legislador_camara_ext"),
+        Index("ix_legislador_bloque", "camara", "bloque"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    camara: Mapped[str] = mapped_column(String(1), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(255), nullable=False)
+    bloque: Mapped[str | None] = mapped_column(String(255))
+    distrito: Mapped[str | None] = mapped_column(String(128))
+    mandato_desde: Mapped[date | None] = mapped_column(Date)
+    mandato_hasta: Mapped[date | None] = mapped_column(Date)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class CongresoSesion(Base):
+    """Una sesión del recinto (ordinaria, especial, informativa...)."""
+
+    __tablename__ = "congreso_sesion"
+    __table_args__ = (
+        CheckConstraint("camara IN ('S', 'D')", name="ck_sesion_camara"),
+        UniqueConstraint("camara", "external_id", name="uq_sesion_camara_ext"),
+        Index("ix_sesion_fecha", "fecha"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    camara: Mapped[str] = mapped_column(String(1), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    tipo: Mapped[str | None] = mapped_column(String(128))
+    periodo: Mapped[int | None] = mapped_column(Integer)
+    reunion: Mapped[int | None] = mapped_column(Integer)
+    numero_sesion: Mapped[int | None] = mapped_column(Integer)
+    url: Mapped[str | None] = mapped_column(String(1024))
+    url_taquigrafica: Mapped[str | None] = mapped_column(String(1024))
+    url_diario: Mapped[str | None] = mapped_column(String(1024))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Votacion(Base):
+    """Un acta de votación. En v1 solo Senado: el voto nominal de Diputados está
+    detrás de un reCAPTCHA y su dataset abierto se cortó en 2020 (la tabla es
+    genérica para cuando haya fuente)."""
+
+    __tablename__ = "votacion"
+    __table_args__ = (
+        CheckConstraint("camara IN ('S', 'D')", name="ck_votacion_camara"),
+        UniqueConstraint("camara", "external_id", name="uq_votacion_camara_ext"),
+        Index("ix_votacion_fecha", "fecha"),
+        Index("ix_votacion_sesion", "sesion_id"),
+        Index("ix_votacion_expedientes", "expedientes", postgresql_using="gin"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    camara: Mapped[str] = mapped_column(String(1), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    sesion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("congreso_sesion.id", ondelete="SET NULL")
+    )
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    numero_acta: Mapped[str | None] = mapped_column(String(32))
+    titulo: Mapped[str] = mapped_column(Text, nullable=False)
+    etapa: Mapped[str | None] = mapped_column(String(64))
+    mayoria: Mapped[str | None] = mapped_column(String(128))
+    resultado: Mapped[str | None] = mapped_column(String(64))
+    afirmativos: Mapped[int | None] = mapped_column(Integer)
+    negativos: Mapped[int | None] = mapped_column(Integer)
+    abstenciones: Mapped[int | None] = mapped_column(Integer)
+    ausentes: Mapped[int | None] = mapped_column(Integer)
+    expedientes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, server_default=text("'{}'")
+    )
+    ordenes_del_dia: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, server_default=text("'{}'")
+    )
+    url: Mapped[str | None] = mapped_column(String(1024))
+    url_pdf: Mapped[str | None] = mapped_column(String(1024))
+    video_url: Mapped[str | None] = mapped_column(String(1024))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    search_vector: Mapped[Any | None] = mapped_column(TSVECTOR)  # GENERATED (0012)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Voto(Base):
+    """Voto nominal. `bloque`/`distrito` son los del momento de votar, no los de hoy."""
+
+    __tablename__ = "voto"
+    __table_args__ = (
+        CheckConstraint(
+            "voto IN ('afirmativo', 'negativo', 'abstencion', 'ausente', 'presidente', 'otro')",
+            name="ck_voto_valor",
+        ),
+        Index("ix_voto_legislador", "legislador_id"),
+    )
+
+    votacion_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("votacion.id", ondelete="CASCADE"), primary_key=True
+    )
+    legislador_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("legislador.id", ondelete="CASCADE"), primary_key=True
+    )
+    voto: Mapped[str] = mapped_column(String(16), nullable=False)
+    bloque: Mapped[str | None] = mapped_column(String(255))
+    distrito: Mapped[str | None] = mapped_column(String(128))
+
+
+class AsuntoTratado(Base):
+    """Un asunto tratado en una sesión y su resultado (Boletín de Asuntos Tratados
+    de Diputados). `clave` lo identifica dentro de la sesión: expediente, O.D. u
+    orden en el boletín, porque no todo asunto tiene expediente."""
+
+    __tablename__ = "asunto_tratado"
+    __table_args__ = (
+        CheckConstraint("camara IN ('S', 'D')", name="ck_asunto_camara"),
+        UniqueConstraint("sesion_id", "clave", name="uq_asunto_sesion_clave"),
+        Index("ix_asunto_expedientes", "expedientes", postgresql_using="gin"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    camara: Mapped[str] = mapped_column(String(1), nullable=False)
+    sesion_id: Mapped[int] = mapped_column(
+        ForeignKey("congreso_sesion.id", ondelete="CASCADE"), nullable=False
+    )
+    clave: Mapped[str] = mapped_column(String(128), nullable=False)
+    expedientes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, server_default=text("'{}'")
+    )
+    orden_del_dia: Mapped[str | None] = mapped_column(String(32))
+    tipo: Mapped[str | None] = mapped_column(String(64))
+    sumario: Mapped[str | None] = mapped_column(Text)
+    resultado: Mapped[str | None] = mapped_column(String(255))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ReunionComision(Base):
+    """Una reunión de comisión agendada. `expedientes` sale del temario libre
+    (`extraer_expedientes`), así que puede venir vacío aunque se trate un proyecto."""
+
+    __tablename__ = "reunion_comision"
+    __table_args__ = (
+        CheckConstraint("camara IN ('S', 'D')", name="ck_reunion_camara"),
+        UniqueConstraint("camara", "external_id", name="uq_reunion_camara_ext"),
+        Index("ix_reunion_fecha", "fecha_hora"),
+        Index("ix_reunion_expedientes", "expedientes", postgresql_using="gin"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    camara: Mapped[str] = mapped_column(String(1), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    fecha_hora: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    comision: Mapped[str] = mapped_column(String(512), nullable=False)
+    sala: Mapped[str | None] = mapped_column(String(255))
+    tipo: Mapped[str | None] = mapped_column(String(128))
+    temario: Mapped[str | None] = mapped_column(Text)
+    expedientes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, server_default=text("'{}'")
+    )
+    url_citacion: Mapped[str | None] = mapped_column(String(1024))
+    raw: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    search_vector: Mapped[Any | None] = mapped_column(TSVECTOR)  # GENERATED (0012)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Alerta(Base):

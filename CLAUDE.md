@@ -19,7 +19,7 @@ apps/web/       Next.js 16 App Router (JSX, no TS) — tema OpenArg dark + palet
 apps/workers/   Celery (vigia_workers) — tasks de ingesta + matching de alertas + beat schedule
 packages/shared/      modelos SQLAlchemy + schemas Pydantic + constantes (vigia_shared)
 packages/connectors/  InfoLEG + HCDN (vigia_connectors)
-db/alembic/     migraciones (0001 inicial … 0010 api_key, 0011 créditos)
+db/alembic/     migraciones (0001 inicial … 0011 créditos, 0012 congreso)
 infra/          Caddyfile, ec2-user-data.sh, DEPLOY.md (runbook completo)
 ```
 
@@ -209,6 +209,26 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   al web implica agregarlo a mano en `app/api/vigia/[...path]/route.js` (un rewrite
   `:path*` ya se removió una vez por dejar un proxy abierto en Vercel). `/api-keys`
   ya está en la allowlist y su UI vive en `app/(app)/settings/api/page.jsx`.
+- **Congreso: lo que PASA no entra a `norma`.** Votaciones, sesiones, asuntos
+  tratados y agenda de comisiones van en tablas propias (migración 0012), igual
+  que `aviso_societario`. El cruce con los proyectos es por **expediente
+  canónico** `NNNN-ORIGEN-AAAA` (`vigia_shared/expedientes.py`): `text[]` con GIN
+  en las dos puntas y solapamiento `&&`, porque un proyecto tiene un expediente
+  **por cámara** (entra por Diputados como `0010-PE-2026` y en el Senado es
+  `CD-12/26`). Si una forma nueva no normaliza, el cruce no falla: no encuentra
+  nada — por eso cada forma vista en una fuente real va como caso de test.
+  `norma.expedientes` lo llenan solo los mappers de proyectos y `upsert_normas`
+  lo actualiza solo si el batch lo trae (las demás fuentes no lo vacían).
+  Histórico: `backfill_expedientes` (su `sin_expediente` delata formas que el
+  normalizador no reconoce).
+- **`senado_proyectos` ingiere orígenes S/PE/JGM/OV, no solo S** (desde 0012):
+  sin PE las votaciones del Senado sobre proyectos del Ejecutivo no tenían con
+  qué cruzarse. `CD` sigue afuera (ya entra por HCDN). Un backfill con
+  `max_pages` alto crea normas en masa → `notify=False`.
+- **Voto nominal de Diputados: `votaciones.hcdn.gob.ar` tiene reCAPTCHA v3 y NO
+  se esquiva.** El dataset CKAN `votaciones_nominales` se cortó en feb-2020. Para
+  Diputados se usan resultados por expediente (Boletín de Asuntos Tratados); el
+  Senado sí tiene voto nominal en HTML (`/votaciones/detalleActa/{id}`).
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.

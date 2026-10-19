@@ -43,3 +43,21 @@ def test_parse_detalle_fecha_y_autores():
 
 def test_parse_listado_vacio():
     assert parse_listado("<html><body>nada</body></html>") == []
+
+
+def test_origenes_ingesta_no_duplican_hcdn_pero_cubren_el_ejecutivo():
+    from vigia_connectors.senado import ORIGENES_INGESTA
+
+    # CD ya entra por hcdn_proyectos; sin PE/JGM las votaciones del Senado sobre
+    # proyectos del Ejecutivo no tendrían proyecto contra el cual cruzarse.
+    assert "CD" not in ORIGENES_INGESTA
+    assert {"S", "PE", "JGM"} <= set(ORIGENES_INGESTA)
+
+
+def test_external_id_del_senado_normaliza_al_mismo_expediente_que_la_votacion():
+    from vigia_connectors.senado import SenadoProyecto
+    from vigia_shared.expedientes import normalizar_expediente
+
+    p = SenadoProyecto(numero="159", anio="25", tipo_codigo="PL", origen="PE", extracto="x")
+    # El acta de votación lo cita como "PE-159/25-PL".
+    assert normalizar_expediente(p.external_id) == normalizar_expediente("PE-159/25-PL")

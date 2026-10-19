@@ -95,6 +95,11 @@ async def upsert_normas(source: dict, normas: list[dict]) -> dict[str, int]:
         # Conservar el resumen IA existente cuando esta corrida no trae uno
         # (re-ingestas idempotentes, o fallo puntual del LLM en el lookback).
         set_["resumen_ia"] = func.coalesce(stmt.excluded.resumen_ia, Norma.resumen_ia)
+        # `expedientes` solo lo traen las fuentes de proyectos. Se actualiza
+        # únicamente si el batch lo trae: una fuente que no lo conoce no debe
+        # vaciar lo que llenó `backfill_expedientes`.
+        if "expedientes" in normas[0]:
+            set_["expedientes"] = stmt.excluded.expedientes
         stmt = stmt.on_conflict_do_update(
             index_elements=["source_id", "external_id"],
             set_=set_,
