@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/alerts', label: 'Alertas', icon: Bell },
   { to: '/dnu', label: 'Tracker DNU', icon: Shield },
   { to: '/avisos', label: 'Radar societario', icon: Building2 },
+  { to: '/congreso', label: 'Congreso', icon: Landmark },
 ];
 
 export default function Sidebar({ open, onClose }) {

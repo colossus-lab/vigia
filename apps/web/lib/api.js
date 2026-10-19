@@ -37,6 +37,17 @@ export const api = {
   listAvisos: (params) => get(`/avisos${qs(params)}`),
   avisosRubros: (params) => get(`/avisos/rubros${qs(params)}`),
   avisosStats: (params) => get(`/avisos/stats${qs(params)}`),
+  // Congreso (contrato: docs/congreso-api.md). Públicos como el resto de los
+  // datos: el gating de la sección es del proxy del web, no de la API.
+  congresoResumen: () => get('/congreso/resumen'),
+  congresoAgenda: (params) => get(`/congreso/agenda${qs(params)}`),
+  congresoVotaciones: (params) => get(`/congreso/votaciones${qs(params)}`),
+  congresoVotacion: (id) => get(`/congreso/votaciones/${id}`),
+  congresoSesiones: (params) => get(`/congreso/sesiones${qs(params)}`),
+  congresoSesion: (id) => get(`/congreso/sesiones/${id}`),
+  congresoLegisladores: (params) => get(`/congreso/legisladores${qs(params)}`),
+  congresoLegislador: (id) => get(`/congreso/legisladores/${id}`),
+  congresoActividad: (params) => get(`/congreso/actividad${qs(params)}`),
 };
 
 export { BASE as API_BASE };
