@@ -14,7 +14,7 @@ SQLAlchemy 2.0 + Postgres 16/pgvector + Celery/Redis + Next.js 16 + NextAuth.
 ## Mapa del monorepo
 
 ```
-apps/api/       FastAPI (vigia_api) — routers: health, normas, search (FTS), stats, auth, workspaces, invitations, alerts
+apps/api/       FastAPI (vigia_api) — routers: health, normas, search (FTS), stats, auth, workspaces, invitations, alerts, avisos, congreso
 apps/web/       Next.js 16 App Router (JSX, no TS) — tema OpenArg dark + paleta Argentina
 apps/workers/   Celery (vigia_workers) — tasks de ingesta + matching de alertas + beat schedule
 packages/shared/      modelos SQLAlchemy + schemas Pydantic + constantes (vigia_shared)
@@ -253,6 +253,36 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   - ~1.000 actas citan solo la **orden del día**, sin expediente. Cruzarlas
     exige resolver la O.D. contra el expediente
     (`/parlamentario/parlamentaria/ordenDelDiaResultadoLink/{anio}/{n}`).
+- **API `/congreso`** (`routers/congreso.py`, contrato en `docs/congreso-api.md`):
+  - Es **pública y cacheable** (está en `_CACHEABLE_PREFIXES`). El gating de la
+    sección lo hace el web en `proxy.js`. `/congreso/resumen` además se cachea
+    300 s en memoria.
+  - **"Sin fuente" es `null`, no 0.** `votaciones_30d` y `estadisticas` valen
+    `null` cuando la cámara no tiene ninguna votación en la tabla, que hoy es
+    Diputados. No está hardcodeado a `D`: si aparece una fuente de voto
+    nominal, se prende solo. El web lo muestra como "sin datos".
+  - **Los proyectos cruzados se traen en UNA consulta por página**
+    (`_proyectos_para` → `asignar_proyectos`). No agregar consultas por ítem.
+  - `alineamiento_bloque` descarta los empates del bloque y los monobloques: si
+    no, un monobloque da 100% fijo.
+  - Las fechas van con offset fijo `-03:00` y sin zoneinfo, porque Windows no
+    trae tzdata.
+- **Sección web `/congreso`** (`app/(app)/congreso/`, `components/congreso/`,
+  `lib/congreso.js` con `pnpm test:congreso`):
+  - **El contenido ancho se cuela como ancho intrínseco** a través de los flex
+    del layout `(app)` y deja la página más ancha que el celular, aunque el
+    elemento tenga `overflow-x-auto`.
+    - Pasó con una sub-nav `min-w-max`, con el `ResponsiveContainer` de
+      recharts y con un `truncate` dentro de un `flex-1 min-w-0`.
+    - Remedio: `[contain:inline-size]` en el contenedor, o `break-words` en vez
+      de `truncate`.
+    - Diagnóstico: ocultar secciones de a una y medir
+      `document.documentElement.scrollWidth`.
+  - **Una `fecha` `YYYY-MM-DD` no pasa por `new Date()`**: la toma como
+    medianoche UTC y en Argentina queda el día anterior.
+  - Las filas de votación y sesión son un `div` clickeable con el título como
+    `<Link>`: adentro hay links a los proyectos, y un `<a>` dentro de otro rompe
+    la hidratación.
 - **Voto nominal de Diputados: `votaciones.hcdn.gob.ar` tiene reCAPTCHA v3 y NO
   se esquiva.** El dataset CKAN `votaciones_nominales` se cortó en feb-2020. Para
   Diputados se usan resultados por expediente (Boletín de Asuntos Tratados); el
