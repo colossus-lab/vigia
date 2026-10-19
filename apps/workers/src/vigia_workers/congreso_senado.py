@@ -607,13 +607,41 @@ def agenda_vacia_sospechosa(d: date) -> bool:
     return d.weekday() <= 3 and not en_receso(d)
 
 
+def reuniones_a_dar_de_baja(
+    guardadas: Iterable[tuple[str, datetime]],
+    scrapeadas: list[dict[str, Any]],
+    *,
+    ahora: datetime,
+) -> list[str]:
+    """Reuniones guardadas que la agenda de hoy ya no trae: suspendidas o reprogramadas.
+
+    El `external_id` es un hash de fecha_hora + comisión, así que una reunión que
+    cambia de hora deja la fila vieja y suma una nueva; una suspendida desaparece
+    de la agenda pero seguiría en la base como si se fuera a hacer. Se da de baja
+    una guardada si las tres cosas son ciertas:
+    - todavía no pasó (`fecha_hora >= ahora`): el pasado no se toca;
+    - su día (hora argentina) es uno de los que trajo la agenda: de los días que
+      la página no muestra no sabemos nada;
+    - su `external_id` no está entre las scrapeadas.
+
+    Con la agenda vacía no se da de baja nada (para eso está el `warn`).
+    """
+    if not scrapeadas:
+        return []
+    dias = {r["fecha_hora"].astimezone(ART).date() for r in scrapeadas}
+    vigentes = {r["external_id"] for r in scrapeadas}
+    return [
+        eid for eid, fh in guardadas
+        if fh >= ahora and fh.astimezone(ART).date() in dias and eid not in vigentes
+    ]
+
+
 @celery_app.task(name="vigia_workers.congreso_senado.ingest_senado_agenda")
 def ingest_senado_agenda(dry_run: bool = False) -> dict[str, Any]:
     """Agenda de comisiones (y de asesores) de los próximos días.
 
-    Una reunión que cambia de hora o de día genera otro `external_id` (es un
-    hash de fecha_hora + comisión): las futuras que dejaron de figurar dentro del
-    rango de días publicado se borran, para no mostrar una reunión fantasma.
+    Después del upsert da de baja las reuniones suspendidas o reprogramadas
+    (`reuniones_a_dar_de_baja`), para que "esta semana" no muestre fantasmas.
     """
     dry = _dry(dry_run)
     hoy = _hoy()
@@ -638,19 +666,21 @@ def ingest_senado_agenda(dry_run: bool = False) -> dict[str, Any]:
             actualizar=["fecha_hora", "comision", "sala", "tipo", "temario",
                         "expedientes", "url_citacion", "raw"],
         )
-        out["podadas"] = 0
+        out["bajas"] = 0
         if rows:
-            dias = [r["fecha_hora"].date() for r in rows]
             async with session_scope() as session:
-                res = await session.execute(text("""
-                    DELETE FROM reunion_comision
-                    WHERE camara = :c AND fecha_hora > now()
-                      AND (fecha_hora AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
-                          BETWEEN :d0 AND :d1
-                      AND NOT (external_id = ANY(:ids))
-                """), {"c": _CAMARA, "d0": min(dias), "d1": max(dias),
-                       "ids": [r["external_id"] for r in rows]})
-                out["podadas"] = res.rowcount or 0
+                futuras = (await session.execute(text(
+                    "SELECT external_id, fecha_hora FROM reunion_comision "
+                    "WHERE camara = :c AND fecha_hora >= now()"
+                ), {"c": _CAMARA})).all()
+                bajas = reuniones_a_dar_de_baja(
+                    [(f[0], f[1]) for f in futuras], rows, ahora=datetime.now(ART)
+                )
+                if bajas:
+                    res = await session.execute(text(
+                        "DELETE FROM reunion_comision WHERE camara = :c AND external_id = ANY(:ids)"
+                    ), {"c": _CAMARA, "ids": bajas})
+                    out["bajas"] = res.rowcount or 0
         return out
 
     if dry:

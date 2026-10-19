@@ -6,7 +6,7 @@ rechazar por Postgres. Por eso se chequea contra las columnas del modelo.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from vigia_connectors.senado_actividad import (
@@ -31,6 +31,7 @@ from vigia_workers.congreso_senado import (
     _voto_to_row,
     agenda_vacia_sospechosa,
     en_receso,
+    reuniones_a_dar_de_baja,
 )
 
 FIXTURES = Path(__file__).parents[3] / "packages" / "connectors" / "tests" / "fixtures"
@@ -199,3 +200,26 @@ def test_listado_acta_tiene_url():
                     resultado=None, mayoria=None, expedientes=[], ordenes_del_dia=[],
                     url_pdf=None, video_url=None)
     assert _votacion_to_row(a, None)["url"].endswith("/votaciones/detalleActa/1")
+
+
+def test_reuniones_a_dar_de_baja():
+    ahora = datetime(2026, 10, 20, 12, 0, tzinfo=ART)
+
+    def r(eid, d, h):
+        return {"external_id": eid, "fecha_hora": datetime(2026, 10, d, h, 0, tzinfo=ART)}
+
+    scrapeadas = [r("a", 20, 16), r("b", 21, 12)]
+    guardadas = [
+        ("a", datetime(2026, 10, 20, 16, 0, tzinfo=ART)),        # sigue en la agenda
+        ("reprogramada", datetime(2026, 10, 21, 10, 0, tzinfo=ART)),  # mismo día, ya no figura
+        ("suspendida", datetime(2026, 10, 20, 15, 0, tzinfo=ART)),
+        ("ya_paso", datetime(2026, 10, 20, 9, 0, tzinfo=ART)),   # hoy, pero antes de ahora
+        ("otro_dia", datetime(2026, 10, 22, 10, 0, tzinfo=ART)), # día que la agenda no mostró
+        # 02:00 UTC del 21 = 23:00 ART del 20: cuenta como día 20 (hora argentina).
+        ("utc", datetime(2026, 10, 21, 2, 0, tzinfo=timezone.utc)),
+    ]
+    assert reuniones_a_dar_de_baja(guardadas, scrapeadas, ahora=ahora) == [
+        "reprogramada", "suspendida", "utc",
+    ]
+    # Agenda vacía: no se borra nada.
+    assert reuniones_a_dar_de_baja(guardadas, [], ahora=ahora) == []
