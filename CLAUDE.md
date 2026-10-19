@@ -221,10 +221,24 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   lo actualiza solo si el batch lo trae (las demás fuentes no lo vacían).
   Histórico: `backfill_expedientes` (su `sin_expediente` delata formas que el
   normalizador no reconoce).
-- **`senado_proyectos` ingiere orígenes S/PE/JGM/OV, no solo S** (desde 0012):
-  sin PE las votaciones del Senado sobre proyectos del Ejecutivo no tenían con
-  qué cruzarse. `CD` sigue afuera (ya entra por HCDN). Un backfill con
-  `max_pages` alto crea normas en masa → `notify=False`.
+- **`senado_proyectos` ingiere orígenes S/PE/JGM/OV y busca ORIGEN POR ORIGEN**
+  (`expedienteLugar` del buscador). La primera versión filtraba por origen
+  *después* de bajar las páginas, y en prod no trajo ni un PE reciente:
+  mezclados, los S (~2.000-6.500 por año) llenan las primeras páginas y los del
+  Ejecutivo (~50-90 por año) no aparecen nunca. `CD` sigue afuera (ya entra
+  por HCDN).
+  - Backfill: `ingest_senado_proyectos(anio_desde=2006, origenes=[...],
+    notify=False)` recorre año por año (`expedienteNumeroPos`). **Con
+    `anio_desde` la task se niega a correr si `notify=True`.**
+  - Las páginas fuera de rango vuelven 200 con la tabla vacía: el corte es la
+    primera vacía, con un tope duro de 1000.
+- **No toda votación del Senado cruza con un proyecto, y no es un bug**:
+  - Muchos expedientes PE votados son **acuerdos** (pliegos de ascensos,
+    jueces, embajadores), y no proyectos. Su tipo no está en `TIPOS_PROYECTO`.
+    Suelen votarse en bloque bajo "Temas Varios Expedientes".
+  - ~1.000 actas citan solo la **orden del día**, sin expediente. Cruzarlas
+    exige resolver la O.D. contra el expediente
+    (`/parlamentario/parlamentaria/ordenDelDiaResultadoLink/{anio}/{n}`).
 - **Voto nominal de Diputados: `votaciones.hcdn.gob.ar` tiene reCAPTCHA v3 y NO
   se esquiva.** El dataset CKAN `votaciones_nominales` se cortó en feb-2020. Para
   Diputados se usan resultados por expediente (Boletín de Asuntos Tratados); el

@@ -28,6 +28,7 @@ from vigia_connectors import (
     HcdnClient, HcdnProyecto, InfoLegClient, InfoLegNorm, SenadoClient, SenadoProyecto,
 )
 from vigia_connectors.bora import LISTADO_TOPE, listado_truncado, looks_like_dnu
+from vigia_connectors.senado import ORIGENES_INGESTA
 from vigia_connectors.emisores import detect_emisor
 from sqlalchemy import text
 
@@ -231,29 +232,75 @@ def _senado_to_row(p: SenadoProyecto) -> dict[str, Any]:
 
 
 @celery_app.task(name="vigia_workers.tasks.ingest_senado_proyectos")
-def ingest_senado_proyectos(dry_run: bool = False, max_pages: int = 3, notify: bool = True) -> dict[str, Any]:
-    """Ingesta proyectos recientes que ingresan por el Senado (scrape del buscador HSN).
+def ingest_senado_proyectos(
+    dry_run: bool = False,
+    max_pages: int = 3,
+    notify: bool = True,
+    anio_desde: int | None = None,
+    origenes: list[str] | None = None,
+) -> dict[str, Any]:
+    """Ingesta proyectos que ingresan por el Senado (scrape del buscador HSN).
 
     Orígenes S/PE/JGM/OV (`ORIGENES_INGESTA`); los venidos de Diputados ya están
-    en hcdn_proyectos. Upsert idempotente por external_id =
+    en hcdn_proyectos. Se busca **origen por origen**: mezclados, los S tapan a
+    los del Ejecutivo. Upsert idempotente por external_id =
     '{numero}/{anio}-{origen}-{tipo}'.
 
-    ⚠️ Un backfill con `max_pages` alto crea normas nuevas en masa: correrlo con
-    `notify=False` o sale un mail de alerta por cada match.
+    - Diario (beat): las primeras `max_pages` páginas de cada tipo y origen.
+    - Backfill: `anio_desde=2008` recorre año por año, del actual hacia atrás, y
+      pagina todo. `origenes=["PE", "JGM", "OV"]` lo acota (S pesa ~2.000-6.500
+      proyectos por año; PE ~50-90). Persiste año por año, así un corte a mitad
+      de camino no pierde lo ya traído.
+
+    ⚠️ Un backfill crea normas en masa y cada match de alerta sería un mail: con
+    `anio_desde` la task exige `notify=False` y se niega a correr si no.
     """
+    if anio_desde is not None and notify:
+        raise ValueError(
+            "backfill de senado_proyectos con notify=True: mandaría un mail de alerta "
+            "por cada proyecto histórico que matchee. Correrlo con notify=False."
+        )
     dry = _is_dry_run(dry_run)
     SOURCE = catalog_fields("senado_proyectos")
+    origs = tuple(origenes) if origenes else ORIGENES_INGESTA
 
-    async def _run() -> dict[str, Any]:
-        async with SenadoClient() as client:
-            proyectos = await client.fetch_recientes(max_pages=max_pages)
+    async def _persistir(proyectos: list[SenadoProyecto], totals: dict[str, int]) -> None:
         rows = [_senado_to_row(p) for p in proyectos]
-        if dry:
-            return {"rows": len(rows), "sample": [_dry_sample_row(r) for r in rows[:_DRY_SAMPLE]]}
-        totals = _empty_totals()
         for i in range(0, len(rows), _FULL_BATCH):
             _acc(totals, await upsert_normas(SOURCE, rows[i : i + _FULL_BATCH]))
-        return totals
+
+    async def _run() -> dict[str, Any]:
+        totals = _empty_totals()
+        sample: list[dict[str, Any]] = []
+        por_anio: dict[int, int] = {}
+        async with SenadoClient() as client:
+            if anio_desde is None:
+                lotes = [(None, await client.fetch_recientes(max_pages=max_pages, origenes=origs))]
+            else:
+                lotes = []
+                for anio in range(date.today().year, anio_desde - 1, -1):
+                    # En backfill, persistir cada año apenas llega (no acumular
+                    # ~6.000 proyectos por año en memoria antes de escribir).
+                    # El dry-run solo cuenta: sin detalles (fecha/autores), que son
+                    # la parte lenta (~1 request por proyecto).
+                    proyectos = await client.fetch_anio(anio, origenes=origs, con_detalle=not dry)
+                    por_anio[anio] = len(proyectos)
+                    if dry:
+                        lotes.append((anio, proyectos))
+                    else:
+                        await _persistir(proyectos, totals)
+        for _, proyectos in lotes:
+            if dry:
+                totals["rows"] += len(proyectos)
+                sample.extend(_dry_sample_row(_senado_to_row(p)) for p in proyectos[: _DRY_SAMPLE - len(sample)])
+            else:
+                await _persistir(proyectos, totals)
+        out: dict[str, Any] = {"origenes": list(origs)}
+        if por_anio:
+            out["por_anio"] = por_anio
+        if dry:
+            return {**out, "rows": totals["rows"], "sample": sample}
+        return {**out, **totals}
 
     if dry:
         result = run_async(_run())

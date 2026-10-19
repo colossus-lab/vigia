@@ -263,6 +263,16 @@ $W "from vigia_workers.congreso_hcdn import ingest_hcdn_asuntos as t; print(t(pe
 $W "from vigia_workers.congreso_hcdn import ingest_hcdn_agenda as t; print(t())"
 ```
 
+Proyectos que ingresan por el Senado (`senado_proyectos`, que **sí crea normas**:
+siempre con `notify=False`, la task se niega sin eso). El histórico del
+Ejecutivo es barato; el de origen S son ~2.000-6.500 proyectos por año y lleva
+horas por los detalles:
+
+```bash
+$W "from vigia_workers.tasks import ingest_senado_proyectos as t; print(t(dry_run=True, anio_desde=2006, origenes=['PE','JGM','OV']))"
+$W "from vigia_workers.tasks import ingest_senado_proyectos as t; print(t(anio_desde=2006, origenes=['PE','JGM','OV'], notify=False))"
+```
+
 Senado (`senado_legisladores`, `senado_sesiones`, `senado_votaciones`,
 `senado_agenda`). Tampoco crean normas ni notifican:
 
