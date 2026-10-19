@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+    <html lang="es">
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    
+    
+    
+<head>
+		   
+
+
+
+
+
+
+
+
+
+
+	
+
+	<meta charset="UTF-8">	
+	<meta name="description" content="Agenda Parlamentaria con  indicación de hora y salas " />			
+	<meta name="keywords" content="Agenda Parlamentaria" />	
+	<meta http-equiv="expires" content="0"/>
+	<meta name="robots" content="index, follow" />
+	<meta name="revisit-after" content="7 days" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	 
+        
+        
+            <title>Agenda Parlamentaria</title>
+        
+    
+
+	<meta name="version" content="3.0">
+
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-1Q0ZDMM4ZH"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+	
+	  gtag('config', 'G-1Q0ZDMM4ZH');
+	</script>
+
+	<!-- Google Tag Manager 
+	<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+														  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+			j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+				'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+								})(window,document,'script','dataLayer','GTM-NW7PCRN5');</script>
+	End Google Tag Manager -->
+	
+	<link rel="apple-touch-icon" sizes="180x180"  href="/export/system/modules/ar.gob.hcdn.base/resources/img/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/export/system/modules/ar.gob.hcdn.base/resources/img/favicon-32x32.png" >
+	<link rel="icon" type="image/png" sizes="16x16"  href="/export/system/modules/ar.gob.hcdn.base/resources/img/favicon-16x16.png" >
+	<link rel="icon" type="image/png" sizes="16x16"  href="/system/modules/ar.gob.hcdn.base/resources/img/favicon.ico" >
+	
+	
+	<link href='/export/system/modules/ar.gob.hcdn.base/resources/vendor/css/roboto.min.css' rel='stylesheet' type='text/css'>	
+
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/css/bootstrap.min.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/fontawesome6/css/fontawesome.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/fontawesome6/css/brands.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/fontawesome6/css/solid.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/slick/css/slick.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/slick/css/slick-theme.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/vendor/css/video-js.css" rel="stylesheet" />
+	
+	
+<link rel="stylesheet" href="/export/system/modules/ar.gob.hcdn.grid/resources/css/sgGrid.css" type="text/css" />
+	
+	
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/comisiones.css" rel="stylesheet"> 
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/var.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/body.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/header.css" rel="stylesheet">
+    <link href="/export/system/modules/ar.gob.hcdn.base/resources/css/nav-tpl.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/footer.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/nav-left.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/buttons.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/tables.css" rel="stylesheet">
+	<link href="/export/system/modules/ar.gob.hcdn.base/resources/css/paginador.css" rel="stylesheet">
+	<!--<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/jquery-3.2.1.min.js"></script>-->
+	
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/jquery-3.7.1.min.js"></script>
+
+	
+	
+	
+	
+	
+	 <!-- Videojs -->
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/ie8/videojs-ie8.min.js"></script>
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/video.min.js"></script>
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/lang/es.js"></script>
+	  <!-- Videojs: Flash fallback -->
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/plugins/videojs-flash.min.js"></script>
+	  <!-- Videojs: Hls -->
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/plugins/videojs-hls.min.js"></script>
+	  <!-- Videojs: Dash -->
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/plugins/dash.all.min.js"></script>
+	<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/vjs/plugins/videojs-dash.min.js"></script>
+	
+	<script src="/system/modules/ar.gob.hcdn.base/resources/js/hcdn.js"></script>
+	
+	
+</head>
+
+		<body>
+
+				<!-- Google Tag Manager (noscript) 
+				<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NW7PCRN5"
+								  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+				 End Google Tag Manager (noscript) -->	
+			
+				<div  class="header-hcdn">
+	<header>
+		<div class="row">
+			 <div class="col text-center">
+				<a href="/index.html">
+					<img class="logoHCDN" src="/export/system/modules/ar.gob.hcdn.base/resources/img/logo-hcdn-vertical.jpg" alt="Honorable Cámara  de Diputados 				de la Nación Argentina">					  
+				</a>
+			</div>
+		</div>					      
+	</header>	
+
+	<nav class="navbar navbar-expand-lg nav-top"  id="navTop">
+		<div class="wrapper-nav-top">
+			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-			expanded="false" aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="navbarSupportedContent">
+				<ul class="navbar-nav me-auto mb-2 mb-lg-0" id="nav1">
+					<li class="nav-item dropdown">
+						<a class="nav-link dropdown-toggle" data-bs-auto-close="outside" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+							Institucional
+						</a>
+						<ul class="dropdown-menu" id="subnav1">
+							<li><a class="dropdown-item" href="/institucional/autoridades/index.html">Autoridades</a></li>
+							<li><a class="dropdown-item" href="/institucional/presentacion.html">La cámara</a></li>
+							<li><a class="dropdown-item" href="https://www.congreso.gob.ar/constitucionNacional.php" target="_blank">Constitución Nacional</a></li>
+							<li><a class="dropdown-item" href="https://www.congreso.gob.ar/constitucionesProvinciales.php"  target="_blank">Constituciones Provinciales</a></li>
+							<li><a class="dropdown-item" href="/diplomacia_parlamentaria/index.html">Diplomacia Parlamentaria</a></li>
+							<li><a class="dropdown-item" href="/institucional/cuidadoPatrimonio/index.html">Cuidado del Patrimonio</a></li>
+							<li><a class="dropdown-item" href="/prensa/index.html">Prensa</a></li>
+
+						</ul>
+					</li>
+					<li class="nav-item"><a class="nav-link" aria-current="page" href="/institucional/transparencia/index.html">Transparencia</a></li>
+					
+
+
+
+
+
+
+
+
+		 <li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/diputados/">Diputados</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/proyectos/">Proyectos</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/comisiones/">Comisiones</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/sesiones/">Sesiones</a>
+        </li>
+
+</ul>
+
+				 <ul class="navbar-nav" id="nav2">
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="facebook.com" href="https://www.facebook.com/Diputados.Argentina" target="_blank"><i class="fa-brands fa-facebook-f"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="twiter.com" href="https://twitter.com/DiputadosAR" target="_blank"><i class="fa-brands fa-x-twitter"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="youtube.com" href="https://www.youtube.com/channel/UC5KfW9_wv4tqbIPgY8tMG-w/featured" target="_blank"><i class="fa-brands fa-youtube"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="instagram.com" href="https://www.instagram.com/diputados.argentina" target="_blank"><i class="fa-brands fa-instagram"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="tiktok.com" href="https://www.tiktok.com/@diputadosargentina" target="_blank"><i class="fa-brands fa-tiktok"></i></a></li> 
+				
+				<!--
+				<li class="nav-item dropdown buscador">
+					<a class="nav-link dropdown-toggle" data-bs-auto-close="outside" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+						Buscador
+				  	</a>
+				  	<ul class="dropdown-menu">
+						<li>
+							<form  method="post" class="d-flex" role="search">
+								<div class="input-group busquedaPortada">
+								  <input class="form-control me-2"  aria-label="Buscar" title="buscador" type="text" placeholder="Buscar..." name="query">
+								  <span>
+								        <button type="submit"  action="/results.html"> <i class="fa-solid fa-magnifying-glass"></i></button>
+								  </span>
+								</div>
+								
+								<input type="hidden" name="index" value="Buscador - Todo el Sitio">
+							</form>
+						</li>
+					</ul>
+				</li>
+				-->
+			</ul>
+
+</div>
+		</div>
+	</nav>
+</div>
+
+<script>
+	window.addEventListener('scroll', function() {
+		let navbar = document.querySelector('.header-hcdn');
+		let scrollPosition = window.scrollY || window.pageYOffset;
+
+		if (scrollPosition > 50) {
+			navbar.classList.add('fixed');
+		} else {
+			navbar.classList.remove('fixed');
+		}
+	});
+</script>
+
+
+
+
+
+
+
+
+
+
+
+<nav class="navbar d-none d-md-block " id="navParlamentaria">
+      <ul class="nav container-xl justify-content-center">
+       	
+
+
+
+
+
+
+
+
+		 <li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/diputados/">Diputados</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/proyectos/">Proyectos</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/comisiones/">Comisiones</a>
+        </li>
+		<li class="nav-item li-parl col-2">
+          <a class="nav-link" href="/sesiones/">Sesiones</a>
+        </li>
+
+
+      </ul>
+</nav>
+
+
+<main class="container-fluid
+				
+				
+				">
+				<section class="container-xl mt-4 breadcrumb">
+						<a href="/index.html" style="margin-right: 5px;">Home » </a>
+						Comisiones  » 
+
+							Agenda  » 
+
+							</section>
+					<section class="container-xl" id="nav_left">
+						<div class="nav">
+									<div class="nav-item">
+										
+										<ul class="SagaMenu-listado nivel-1 " data-nivel="1" data-bloque-numero="4" style="">
+												</ul>
+									</div>
+									
+									</div>
+								<a class="nav-link" onclick="window.history.back();" href="#"></a>
+							</section>
+					<section id="main"class="container-xl">
+
+						<div  id="contenedorPpal" class="grid_container" ><div class="sgsection-main_container complex visibilidad-always anchoCompleto" id="sgsection-7419d4d3-372d-11ee-9638-005056894ace" data-cssid="sgsection-7419d4d3-372d-11ee-9638-005056894ace" >
+
+                <div class="sgsection-main_wrapper" id="sgsection-7419d4d3-372d-11ee-9638-005056894ace">
+
+                <div class="sgsection-columna col_xxs-12  visibilidadColumna-always"  data-cssid="sgsection-7419d4d3-372d-11ee-9638-005056894ace-sgsectioncolumn_n1">
+
+                        <div class="cms_container-section" ><div class="sgrow-main_container visibilidadFila-always" id="sgrow_naa82e704-372f-11ee-9638-005056894ace" data-cssid="sgrow_naa82e704-372f-11ee-9638-005056894ace" >
+
+                <div class="sgrow-wrapper">
+
+                <div class="sgrow-columna col_xxs-12  visibilidadColumnaFila-always"  data-cssid="aa82e704-372f-11ee-9638-005056894ace-sgrowcolumn_n1" data-recursos-tipo="agenda">
+
+                        <div class="cms_container-row" ><section>
+<style>
+.column-hover {
+	background:#cedfed;
+}
+</style>
+<table  id="agendaComisiones" class="table table-bordered table-responsive">
+	
+		<thead><tr><th align='center' colspan=2 > martes 20 de octubre del 2026</th></tr></thead>
+<tr><td  width='17%'>
+<strong>10:00</strong>  <br/>Anexo "C" - 2° piso - Informativa <br> <span class='leyenda'>  </span><br>
+
+</td>
+<td>
+<!-- <a href="/comisiones/agenda/reunion.html?reun=1365&prosecretaria=comisiones" target="_self" title="null"><h5></h5></a> -->
+				<a href="/comisiones/permanentes/cpyhacienda" target="_blank"><strong>PRESUPUESTO Y HACIENDA</strong></a>
+							<h5></h5>
+<strong>INVITADOS.</strong><br>
+Fueron invitados el Secretario de Educación y el Subsecretario de Políticas Universitarias, ambos del Ministerio de Capital Humano a fin de abordar el Mensaje Nro. 0043/2026 y proyecto de ley de fecha 15 de septiembre de 2026, de Presupuesto General de la Administración nacional para el Ejercicio Fiscal del año 2027.<br/>
+<a href="https://parlamentaria.hcdn.gob.ar/comisiones/reuniones/1365/archivo/8WG73728B2T7JFVW.pdf" target='_blank'>ver citación</a>
+					</td></tr>
+<tr><td  width='17%'>
+<strong>13:00</strong>  <br/>Sala 1 - Anexo "A" - Informativa <br> <span class='leyenda'>  </span><br>
+<strong> REUNIÓN CONJUNTA </strong>
+</td>
+<td>
+<!-- <a href="/comisiones/agenda/reunion.html?reun=1363&prosecretaria=comisiones" target="_self" title="null"><h5></h5></a> -->
+				<a href="/comisiones/permanentes/creyculto" target="_blank"><strong>RELACIONES EXTERIORES Y CULTO, </strong></a>
+							<a href="/comisiones/permanentes/cmercosur" target="_blank"><strong>MERCOSUR</strong></a>
+							<h5></h5>
+<strong></strong><br>
+Acuerdo de Libre Comercio suscripto entre los Estados miembros de la Asociación Europea de Libre Comercio (AELC) y el Mercosur.<br/>
+<a href="https://parlamentaria.hcdn.gob.ar/comisiones/reuniones/1363/archivo/FTXXSZXD5PH3MJG0.pdf" target='_blank'>ver citación</a>
+					</td></tr>
+<tr><td  width='17%'>
+<strong>15:30</strong>  <br/>Sala 1 - Anexo "A" - Informativa <br> <span class='leyenda'>  </span><br>
+
+</td>
+<td>
+<!-- <a href="/comisiones/agenda/reunion.html?reun=1362&prosecretaria=comisiones" target="_self" title="null"><h5></h5></a> -->
+				<a href="/comisiones/permanentes/ceycombust" target="_blank"><strong>ENERGIA Y COMBUSTIBLES</strong></a>
+							<h5></h5>
+<strong>INVITADOS. </strong><br>
+Fueron invitados expertos quienes expondrán sobre el proyecto de ley por el cual se regulan las actividades de elaboración, almacenaje, comercialización, mezcla y autoconsumo de biocombustibles en el territorio nacional. <br/>
+<a href="https://parlamentaria.hcdn.gob.ar/comisiones/reuniones/1362/archivo/DB7QVWEXBA9AWJN1.pdf" target='_blank'>ver citación</a>
+					</td></tr>
+<tr><td  width='17%'>
+<strong>16:00</strong>  <br/>Anexo "C" - 2° piso <br> <span class='leyenda'>  </span><br>
+<strong> REUNIÓN CONJUNTA </strong>
+</td>
+<td>
+<!-- <a href="/comisiones/agenda/reunion.html?reun=1364&prosecretaria=comisiones" target="_self" title="null"><h5></h5></a> -->
+				<a href="/comisiones/permanentes/cdnacional" target="_blank"><strong>DEFENSA NACIONAL, </strong></a>
+							<a href="/comisiones/permanentes/clpenal" target="_blank"><strong>LEGISLACION PENAL, </strong></a>
+							<a href="/comisiones/permanentes/creyculto" target="_blank"><strong>RELACIONES EXTERIORES Y CULTO</strong></a>
+							<h5></h5>
+<strong></strong><br>
+Mensaje Nro. 275/2026 y proyecto de ley de Defensa de la Soberanía nacional. <br/>
+<a href="https://parlamentaria.hcdn.gob.ar/comisiones/reuniones/1364/archivo/TMPRQP99TKFQH1KX.pdf" target='_blank'>ver citación</a>
+					</td></tr>
+<thead><tr><th align='center' colspan=2 > miércoles 21 de octubre del 2026</th></tr></thead>
+<tr class='column-hover'><td>
+<strong>12:00</strong>  <br/>RECINTO <br> <span class='leyenda'>  </span><br>
+
+</td>
+<td>
+<!-- <a href="/comisiones/agenda/reunion.html?reun=3587&prosecretaria=secparl" target="_self" title="SESIÓN ESPECIAL"><h5>SESIÓN ESPECIAL</h5></a> -->
+				<h5>SESIÓN ESPECIAL</h5>
+<strong>A SOLICITUD DEL DIPUTADO GABRIEL BORNORONI Y OTROS DIPUTADOS</strong><br>
+A fin de considerar el siguiente temario: <br>- Expediente 0032-S-2026. Proyecto de Ley de Inviolabilidad de la Propiedad Privada. Modificación de las leyes 21.499, de expropiaciones y 24.374, de regularización dominial. <br>- Orden del Día 349. Módulo informático interoperable con el Sistema de Trazabilidad de Medicamentos de Alto Riesgo –MAR– y de sus Ingredientes Farmacéuticos Activos –IFA–. Creación.   <br>- Orden del Día 447. Código Penal. Modificaciones sobre Vandalismo Rural. <br>- Orden del Día 442. Inmueble propiedad del Estado nacional, Centro de Acopio y Embarque Barranqueras –CAEB–, en la localidad de Barranqueras, departamento San Fernando, provincia del Chaco. Transferencia a título gratuito a la provincia del Chaco.  <br>- Orden del Día 350. Ley 27.793, de Emergencia Nacional en Discapacidad. Prórroga hasta el 31 de diciembre de 2027 inclusive.<br> - Orden del Día 433. Ley sobre Endeudamiento Familiar. Establecimiento.<br/>
+</td></tr>
+</table>
+</section>
+
+
+</div><input type="hidden" 
+                               data-cssid="aa82e704-372f-11ee-9638-005056894ace-sgrowcolumn_n1" />
+
+                        </div>
+                    <input type="hidden"  data-cssid="sgrow_naa82e704-372f-11ee-9638-005056894ace" />
+                </div>
+
+                
+
+
+
+
+
+
+
+    
+    
+    
+
+    <div class="cms_container-ambito">
+        
+        
+    </div>
+</div>
+
+                </div><input type="hidden" 
+                               data-cssid="sgsection-7419d4d3-372d-11ee-9638-005056894ace-sgsectioncolumn_n1" />
+
+                        
+
+
+
+
+
+
+
+    
+    
+    
+
+    <div class="cms_container-ambito">
+        
+        
+    </div>
+</div>
+                    <input type="hidden" 
+                       data-cssid="sgsection-7419d4d3-372d-11ee-9638-005056894ace"  />
+
+                </div>
+
+                
+
+
+
+
+
+
+
+    
+    
+    
+
+    <div class="cms_container-ambito">
+        
+        
+    </div>
+</div>
+            </div>
+<script src="/export/system/modules/ar.gob.hcdn.base/resources/js/frontend.js"></script>
+<script src="/export/system/modules/ar.gob.hcdn.grid/resources/js/grid.js"></script><script>
+							$(document).ready(function () {
+								$('#pagina').formacionSAGA();
+							});
+						</script>
+					</section>
+				</main>
+				
+				
+			
+
+
+
+
+
+<footer>
+	
+	
+
+	<div class="wrapper-footer container-xl">
+		<div class="row">
+			<div class="col-12 col-lg-3 col-redes">
+				<div class="titfooter"><a>SEGUINOS EN</a></div>
+				<nav class="navbar navbar-expand-lg">
+					<ul class="navbar-nav" id="nav2">
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="facebook.com" href="https://www.facebook.com/Diputados.Argentina" target="_blank"><i class="fa-brands fa-facebook-f"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="twiter.com" href="https://twitter.com/DiputadosAR" target="_blank"><i class="fa-brands fa-x-twitter"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="youtube.com" href="https://www.youtube.com/channel/UC5KfW9_wv4tqbIPgY8tMG-w/featured" target="_blank"><i class="fa-brands fa-youtube"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="instagram.com" href="https://www.instagram.com/diputados.argentina" target="_blank"><i class="fa-brands fa-instagram"></i></a></li>
+				<li class="nav-item"><a class="nav-link" aria-current="page" aria-label="tiktok.com" href="https://www.tiktok.com/@diputadosargentina" target="_blank"><i class="fa-brands fa-tiktok"></i></a></li> 
+				
+				<!--
+				<li class="nav-item dropdown buscador">
+					<a class="nav-link dropdown-toggle" data-bs-auto-close="outside" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+						Buscador
+				  	</a>
+				  	<ul class="dropdown-menu">
+						<li>
+							<form  method="post" class="d-flex" role="search">
+								<div class="input-group busquedaPortada">
+								  <input class="form-control me-2"  aria-label="Buscar" title="buscador" type="text" placeholder="Buscar..." name="query">
+								  <span>
+								        <button type="submit"  action="/results.html"> <i class="fa-solid fa-magnifying-glass"></i></button>
+								  </span>
+								</div>
+								
+								<input type="hidden" name="index" value="Buscador - Todo el Sitio">
+							</form>
+						</li>
+					</ul>
+				</li>
+				-->
+			</ul>
+
+	
+				</nav>
+			</div>
+			
+			<div class="d-none d-md-block col-md-12 col-lg-9">
+				<div class="row">
+						<div class="col-4">
+							<ul>
+							<ul>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link dropdown-toggle" title="Institucional" role="button" data-bs-toggle="dropdown" aria-expanded="false"> Institucional </a>
+							<ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+							<li><a class="dropdown-item" title="La Cámara" href="/institucional/autoridades/index.html">Autoridades</a></li>
+							<li><a class="dropdown-item" title="La Cámara" href="/institucional/reglamento/presentacion.html">La Cámara</a></li>
+							<li><a class="dropdown-item" title="congreso" href="https://www.congreso.gob.ar/constitucionNacional.php" target="_blank" rel="noopener">Constitución Nacional</a></li>
+							<li><a class="dropdown-item" title="congreso" href="https://www.congreso.gob.ar/constitucionesProvinciales.php" target="_blank" rel="noopener">Constituciones Provinciales</a></li>
+							<li><a class="dropdown-item" title="diplomacia parlamentaria" href="/diplomacia_parlamentaria/index.html">Diplomacia Parlamentaria</a></li>
+							<li><a class="dropdown-item" href="/institucional/cuidadoPatrimonio/index.html">Cuidado del Patrimonio</a></li>
+							<li><a class="dropdown-item" title="prensa" href="/prensa/index.html">Prensa</a></li>
+							</ul>
+							</li>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link " href="/institucional/transparencia/"> Transparencia</a></li>
+							
+							
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link link-interno" href="/secparl/archivo_parlamentario/index.html">Archivo Parlamentario</a></li>
+							
+							</ul>
+							</ul>
+							</div>
+							<div class="col-4" style="display: grid; justify-content: center;">
+							<ul>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link " href="/diputados/"> Diputados </a></li>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link" href="/proyectos/"> Proyectos </a></li>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link" href="/comisiones/"> Comisiones </a></li>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link" href="/sesiones/"> Sesiones </a></li>
+							</ul>
+							</div>
+							<div class="col-4" style="display: grid; justify-content: end;">
+							<ul>
+							<li class="nav-item dropdown"><a class="nav-link" href="/prensa/">Últimas Noticias</a></li>
+							<li class="nav-item dropdown"><a class="nav-link" href="/comisiones/agenda/">Agenda Parlamentaria</a></li>
+							<li class="nav-item dropdown"><a id="navbarDropdown" class="nav-link dropdown-toggle" role="button" href="#" data-bs-toggle="dropdown" aria-expanded="false"> Sitios de Interés </a>
+							<ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+							<li><a class="dropdown-item" href="https://dtv.hcdn.gob.ar/">Diputados TV</a></li>
+							<li><a class="dropdown-item" href="https://www.congreso.gob.ar/">Congreso de la Nación</a></li>
+							<li><a class="dropdown-item" href="http://icn.gob.ar/">Imprenta del Congreso</a></li>
+							<li><a class="dropdown-item" href="http://www.bcnbib.gov.ar/">Biblioteca del Congreso</a></li>
+							<li><a class="dropdown-item" href="http://www.senado.gov.ar/">Senado</a></li>
+							<li><a class="dropdown-item" href="http://delmolino.gob.ar/">Edificio del Molino</a></li>
+							<li><a class="dropdown-item" href="https://www.opc.gob.ar">Oficina de Presupuesto del Congreso</a></li>
+							</ul>
+							</li>
+							<li class="nav-item dropdown"><a class="nav-link " href="/contacto.html">Contacto</a></li>
+							</ul>
+							</div>
+
+					</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-12  mt-4">
+				
+                	
+					
+						
+					
+            	
+            	
+				<img class=" logoPie d-block mx-auto " src="/export/system/modules/ar.gob.hcdn.base/resources/img/logo-hcdn-blanco.svg" alt="Logo de la Honorable Cámara de Diputados de la Nacion Argentina"/>
+			</div>
+			<div class="col-12 mt-4">
+				<p class="text-center"><strong>Honorable Cámara de Diputados de la Nación Argentina</strong> | Congreso de la Nación Argentina <br/> 
+				Av. Rivadavia 1864 - Ciudad Autónoma de Bs. As. (C.P.C1033AAV) | + 54 11 6075-0000 <br/>
+				Nota: La información contenida en este sitio es de dominio público y puede ser utilizada libremente. Se solicita citar la fuente.</p> 
+			</div>
+		</div>
+	</div>
+</footer>
+
+
+<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/bootstrap.bundle.min.js"  ></script>
+			<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/js/video.min.js"></script>
+			<script src="/export/system/modules/ar.gob.hcdn.base/resources/vendor/slick/js/slick.min.js"></script>
+		</body>
+    </html>
