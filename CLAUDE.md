@@ -280,6 +280,16 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
       `document.documentElement.scrollWidth`.
   - **Una `fecha` `YYYY-MM-DD` no pasa por `new Date()`**: la toma como
     medianoche UTC y en Argentina queda el día anterior.
+  - **El OpenGraph de una sección con login lo arma la página de login.**
+    El bot que arma la preview de un link no tiene sesión, así que sigue el 307
+    y lee `/auth/signin?callbackUrl=/congreso`. Por eso `auth/signin/page.jsx`
+    es un envoltorio de servidor con `generateMetadata` (la UI está en
+    `SignInClient.jsx`) que elige los metadatos con `lib/ogDestino.js`. Para
+    sumar otra sección, se agrega al mapa y a `pnpm test:og`.
+    - La imagen es el route handler `/og/congreso`, fuera de
+      `PROTECTED_PREFIXES`, y no un `opengraph-image.jsx` dentro de `(app)`:
+      dentro de un route group Next publica la imagen con un hash en la ruta
+      (`/congreso/opengraph-image-xu7h1x`), y además quedaría gateada.
   - Las filas de votación y sesión son un `div` clickeable con el título como
     `<Link>`: adentro hay links a los proyectos, y un `<a>` dentro de otro rompe
     la hidratación.

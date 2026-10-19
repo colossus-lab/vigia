@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test:bff": "node scripts/test-bff-token.mjs",
     "test:plural": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-plural.mjs",
-    "test:congreso": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-congreso.mjs"
+    "test:congreso": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-congreso.mjs",
+    "test:og": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-og-destino.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
