@@ -14,7 +14,7 @@ import {
   camaraLabel, camaraTint, votoLabel, votoTint, resultadoTono, resultadoTint, resultadoLabel,
   nombrePropio, partesFecha, diaKey, formatFecha, formatHora, formatFechaHora, tituloDia,
   agruparPorDia, mandato, porcentaje, marcador, proporcionVotos, datosPorBloque, filtrarVotos,
-  hrefActividad, SERIES_BLOQUE, hoyKey, sumarDias, composicionPorBloque, filtrarLegisladores,
+  hrefActividad, SERIES_BLOQUE, hoyKey, sumarDias, nombreComision, textoLegible, composicionPorBloque, filtrarLegisladores,
 } from '../lib/congreso.js';
 import * as F from '../lib/congreso.fixtures.js';
 
@@ -61,7 +61,19 @@ igual(nombrePropio('PRESUPUESTO Y HACIENDA'), 'Presupuesto y Hacienda', 'comisi�
 igual(nombrePropio('DE LA ROSA, MARÍA'), 'De la Rosa, María', 'la primera palabra siempre va en mayúscula');
 igual(nombrePropio('Menem, Martín'), 'Menem, Martín', 'Diputados ya viene bien: no se toca');
 igual(nombrePropio('FRENTE CIVICO DE SANTIAGO'), 'Frente Civico de Santiago', 'bloque');
+igual(nombrePropio('UCR - UNIÓN CÍVICA RADICAL'), 'UCR - Unión Cívica Radical', 'las siglas quedan en mayúsculas');
+igual(nombrePropio('FRENTE PRO'), 'Frente PRO', 'PRO es sigla');
+igual(nombrePropio('PROVINCIAS UNIDAS'), 'Provincias Unidas', 'una palabra que empieza con una sigla no se toca');
 igual(nombrePropio(null), null, 'null -> null');
+igual(nombreComision('DE EDUCACIÓN Y CULTURA'), 'Educación y Cultura', 'comisión del Senado sin el "DE" inicial');
+igual(nombreComision('Acción Social y Salud Pública'), 'Acción Social y Salud Pública', 'comisión de Diputados intacta');
+igual(
+  textoLegible('PROYECTOS DE LEY: SERVICIOS AÉREOS: PE-271/26, MENSAJE N° 225/26. INVITADO EL MINISTRO DE LA UCR.'),
+  'Proyectos de ley: Servicios aéreos: PE-271/26, mensaje n° 225/26. Invitado el ministro de la UCR.',
+  'temario en mayúsculas -> oración, sin tocar expedientes ni siglas'
+);
+igual(textoLegible('Exposición de funcionarios.'), 'Exposición de funcionarios.', 'texto con minúsculas: intacto');
+igual(textoLegible('SALÓN AZUL'), 'Salón azul', 'texto corto en mayúsculas también');
 
 console.log('fechas (con TZ=UTC)');
 igual(diaKey('2026-02-11'), '2026-02-11', 'YYYY-MM-DD no se corre al día anterior');

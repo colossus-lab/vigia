@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, FileText, MapPin } from 'lucide-react';
 import {
   CAMARAS, camaraLabel, camaraTint, votoLabel, votoTint, resultadoLabel, resultadoTint,
-  nombrePropio, formatFecha, formatFechaHora, formatHora, marcador, proporcionVotos, VOTOS,
+  nombrePropio, nombreComision, textoLegible, hoyKey, formatFecha, formatFechaHora, formatHora, marcador, proporcionVotos, VOTOS,
 } from '@/lib/congreso';
 
 export const INPUT_CLS =
@@ -237,7 +237,11 @@ export function SesionRow({ s, i = 0, children }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-0.5">
             <CamaraBadge camara={s.camara} />
-            <span className="text-[10px] text-text-tertiary font-mono">{sesionConteo(s)}</span>
+            {/* La agenda de recinto ya trae sesiones convocadas: "0 asuntos
+                tratados" de algo que todavía no pasó confunde. */}
+            {s.fecha > hoyKey()
+              ? <Badge tint="tint-purple">convocada</Badge>
+              : <span className="text-[10px] text-text-tertiary font-mono">{sesionConteo(s)}</span>}
             <span className="text-[10px] text-text-tertiary font-mono ml-auto flex items-center gap-1">
               <Clock size={9} /> {formatFecha(s.fecha)}
             </span>
@@ -256,7 +260,7 @@ export function SesionRow({ s, i = 0, children }) {
 
 export function ReunionRow({ r, conCamara = true, conFecha = false, i = 0 }) {
   const [abierto, setAbierto] = useState(false);
-  const temario = r.temario?.trim();
+  const temario = textoLegible(r.temario?.trim());
   const largo = temario && temario.length > 220;
   return (
     <div
@@ -274,10 +278,10 @@ export function ReunionRow({ r, conCamara = true, conFecha = false, i = 0 }) {
             {conFecha && <span className="text-[10px] text-text-tertiary font-mono">{formatFecha(r.fecha_hora)}</span>}
           </div>
           <h4 className="text-[13px] font-semibold text-text-primary break-words" style={H3_STYLE}>
-            {nombrePropio(r.comision) || 'Reunión de comisión'}
+            {nombreComision(r.comision) || 'Reunión de comisión'}
           </h4>
           {r.sala && (
-            <p className="text-[10px] text-text-tertiary flex items-center gap-1 mt-0.5"><MapPin size={9} /> {r.sala}</p>
+            <p className="text-[10px] text-text-tertiary flex items-center gap-1 mt-0.5"><MapPin size={9} /> {nombrePropio(r.sala)}</p>
           )}
           {temario && (
             <p className="text-[12px] text-text-secondary leading-relaxed mt-1.5 break-words">

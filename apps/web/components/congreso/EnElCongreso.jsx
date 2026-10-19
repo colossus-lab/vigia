@@ -7,7 +7,7 @@
 import Link from 'next/link';
 import { CalendarDays, Vote, Gavel } from 'lucide-react';
 import {
-  formatFecha, formatFechaHora, formatHora, marcador, nombrePropio, resultadoColor,
+  formatFecha, formatFechaHora, formatHora, marcador, nombrePropio, nombreComision, resultadoColor,
 } from '@/lib/congreso';
 import { CamaraBadge, ResultadoBadge, VotosBar } from '@/components/congreso/ui';
 
@@ -46,8 +46,8 @@ export default function EnElCongreso({ congreso, ahora = new Date() }) {
                   <CamaraBadge camara={r.camara} />
                   {!proximas.includes(r) && <span className="text-[10px] text-text-tertiary">ya pasó</span>}
                 </div>
-                <p className="text-[12px] font-semibold text-text-primary break-words">{nombrePropio(r.comision)}</p>
-                {r.sala && <p className="text-[10px] text-text-tertiary">{r.sala}</p>}
+                <p className="text-[12px] font-semibold text-text-primary break-words">{nombreComision(r.comision)}</p>
+                {r.sala && <p className="text-[10px] text-text-tertiary">{nombrePropio(r.sala)}</p>}
               </div>
             </div>
           ))}

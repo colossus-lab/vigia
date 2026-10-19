@@ -222,8 +222,9 @@ export default function VotacionDetalle() {
               <ProyectosLinks proyectos={v.proyectos} />
             ) : (
               <Vacio>
-                Esta votación no cruza con ningún proyecto cargado en Vigía. Pasa con los acuerdos (pliegos de
-                ascensos, jueces, embajadores), que no son proyectos de ley.
+                {v.expedientes?.length > 0
+                  ? 'Ninguno de sus expedientes cruza con un proyecto cargado en Vigía. Pasa con los acuerdos (pliegos de ascensos, jueces, embajadores), que no son proyectos de ley.'
+                  : 'El acta cita solo la orden del día, sin expediente, así que no hay con qué cruzarla contra los proyectos.'}
               </Vacio>
             )}
             {(v.expedientes?.length > 0 || v.ordenes_del_dia?.length > 0) && (

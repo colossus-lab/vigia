@@ -8,7 +8,7 @@ import FadeIn from '@/components/FadeIn';
 import CountUp from '@/components/CountUp';
 import {
   CAMARAS, ACTIVIDAD, agruparPorDia, tituloDia, formatFecha, formatFechaHora, hrefActividad,
-  resultadoLabel, resultadoColor, nombrePropio,
+  resultadoLabel, resultadoColor, nombrePropio, hoyKey,
 } from '@/lib/congreso';
 import {
   PageHeader, SectionTitle, VerTodo, Badge, CamaraBadge, Cargando, Vacio, ErrorCarga,
@@ -190,7 +190,8 @@ export default function CongresoHub() {
     api.congresoAgenda({ camara: 'D', limit: 30 }).then(setAgendaD).catch(() => setAgendaD(vacia));
     api.congresoVotaciones({ limit: 5 }).then(setVotaciones).catch(() => setVotaciones(vacia));
     api.congresoActividad({ limit: 12 }).then(setActividad).catch(() => setErrActividad(true));
-    api.congresoSesiones({ limit: 4 })
+    // "Últimas": hasta hoy. La lista trae también las convocadas a futuro.
+    api.congresoSesiones({ limit: 4, hasta: hoyKey() })
       .then((d) => {
         setSesiones(d);
         // "Con lo tratado": el listado trae solo conteos, así que pedimos el

@@ -60,6 +60,11 @@ export const resultadoLabel = (r) => (r ? sentence(String(r)) : 'Sin resultado')
 
 export const sentence = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
 
+// Siglas que el Senado manda en mayúsculas y tienen que quedar así
+// ("UCR - UNIÓN CÍVICA RADICAL", "FRENTE PRO"). Las que falten salen
+// capitalizadas ("Ucr"): feo, pero legible.
+const SIGLAS = new Set(['ucr', 'pro', 'pj', 'fit', 'fit-u', 'ari', 'cc', 'lla', 'mid', 'pts', 'mst', 'caba', 'fpv', 'uxp', 'ucede', 'psa', 'fnyp']);
+
 const MINUSCULAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en', 'a', 'al', 'o', 'u', 'con', 'por', 'para']);
 
 /**
@@ -76,10 +81,38 @@ export function nombrePropio(s) {
     .split(/(\s+|-|\(|\/)/)
     .map((w, i) => {
       if (!w || /^(\s+|-|\(|\/)$/.test(w)) return w;
+      if (SIGLAS.has(w)) return w.toUpperCase();
       if (i > 0 && MINUSCULAS.has(w)) return w;
       return w.charAt(0).toUpperCase() + w.slice(1);
     })
     .join('');
+}
+
+/** Nombre de comisión: el Senado antepone "DE " ("DE EDUCACIÓN Y CULTURA"). */
+export function nombreComision(s) {
+  if (!s) return s;
+  return nombrePropio(s.replace(/^DE\s+/, ''));
+}
+
+/**
+ * Texto largo que llega todo en mayúsculas (los temarios del Senado) ->
+ * oración. Se respetan las palabras con dígitos (expedientes como "PE-271/26",
+ * "S-478/26") y las siglas conocidas. Lo que ya trae minúsculas no se toca.
+ */
+export function textoLegible(s) {
+  if (!s || s !== s.toUpperCase() || !/[A-ZÁÉÍÓÚÑ]{4}/.test(s)) return s;
+  let inicio = true;
+  return s.split(/(\s+)/).map((w) => {
+    if (/^\s+$/.test(w) || !w) return w;
+    let out;
+    if (/\d/.test(w) || SIGLAS.has(w.toLowerCase().replace(/[^a-z-]/g, ''))) out = w;
+    else {
+      out = w.toLowerCase();
+      if (inicio) out = out.replace(/\p{L}/u, (c) => c.toUpperCase());
+    }
+    inicio = /[.:;!?]["”»)]?$/.test(w);
+    return out;
+  }).join('');
 }
 
 /* ── Fechas ──────────────────────────────────────────────────── */
