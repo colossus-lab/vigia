@@ -225,6 +225,47 @@ La sección web **Boletines Oficiales** (Nacional/PBA/CABA) consume
 recién **después** del backfill (antes: "Sin ediciones"). Gotcha PBA: cert SSL roto
 → el connector va con `verify_ssl=False` (ya seteado).
 
+**Alta concreta — Congreso** (migración 0012; tablas propias, no `norma`).
+**Orden obligatorio: la migración antes que las imágenes nuevas.** El ORM de
+`Norma` tiene la columna `expedientes`, y sin 0012 la API nueva rompe en
+cualquier `select(Norma)`.
+
+```bash
+# 1. bajar las imágenes nuevas (`migrate` usa la imagen de la api: sin el pull
+#    correría las migraciones viejas y 0012 no existiría)
+docker compose -f docker-compose.prod.yml --profile local-data pull
+# 2. migración, y esperar a que termine (el depends_on de la api NO espera:
+#    con un `up` directo la api nueva puede arrancar antes que el índice GIN)
+docker compose -f docker-compose.prod.yml run --rm migrate
+# 3. levantar
+docker compose -f docker-compose.prod.yml --profile local-data up -d --no-build
+# 4. expedientes canónicos en los PROYECTO históricos (no crea normas, no notifica)
+#    → mirar `sin_expediente`: si es alto, hay una forma que el normalizador no reconoce
+docker compose -f docker-compose.prod.yml run --rm worker \
+  python -c "from vigia_workers.tasks import backfill_expedientes as t; print(t())"
+```
+
+Diputados (`hcdn_legisladores`, `hcdn_sesiones`, `hcdn_asuntos`, `hcdn_agenda`).
+**No crean normas ni disparan alertas**, así que no llevan `notify`:
+
+```bash
+W='docker compose -f docker-compose.prod.yml run --rm worker python -c'
+# dry-run de las cuatro (desde el EC2 la IP es otra: confirmar que el sitio responde igual)
+for t in legisladores sesiones agenda asuntos; do
+  $W "from vigia_workers.congreso_hcdn import ingest_hcdn_$t as t; print(t(dry_run=True))"
+done
+# carga inicial, en este orden (asuntos necesita las sesiones para la FK)
+$W "from vigia_workers.congreso_hcdn import ingest_hcdn_legisladores as t; print(t())"
+$W "from vigia_workers.congreso_hcdn import ingest_hcdn_sesiones as t; print(t())"   # ~1128 sesiones, 1983→
+# backfill de asuntos por período legislativo (hay BAT desde 2008 = período 126);
+# ~20-40 GET por período, secuencial. Un período con algún BAT vacío deja `warn`: esperable.
+$W "from vigia_workers.congreso_hcdn import ingest_hcdn_asuntos as t; print(t(periodos=[144, 143, 142]))"
+$W "from vigia_workers.congreso_hcdn import ingest_hcdn_agenda as t; print(t())"
+```
+
+Al final reiniciar `worker-beat` para que tome los beats nuevos, y confirmar las
+fuentes en `GET /health/sources`.
+
 **Rollback universal de una fuente** (cascade limpia matches y tracking):
 
 ```sql

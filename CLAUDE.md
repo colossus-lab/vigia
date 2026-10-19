@@ -229,6 +229,30 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   se esquiva.** El dataset CKAN `votaciones_nominales` se cortó en feb-2020. Para
   Diputados se usan resultados por expediente (Boletín de Asuntos Tratados); el
   Senado sí tiene voto nominal en HTML (`/votaciones/detalleActa/{id}`).
+- **Diputados en CKAN (`congreso_hcdn.py`)**:
+  - **La "Composición Actual" no trae ID.** El ID `HCDNnnnn` sale del recurso
+    "Diputados" (histórico, una fila por mandato y por bloque) y se cruza por
+    apellido + distrito **del mandato vigente**: el distrito cambia entre
+    mandatos. Para elegir entre varios CSV del mismo package:
+    `resolve_csv_url(package, recurso=...)`.
+  - **Las fechas del CSV `sesiones` vienen 2 días antes** que las del sitio y
+    del BAT (huele a epoch de Excel). `combinar_sesiones` mide el desfase en
+    cada corrida y lo aplica, y la fecha que se guarda es la del sitio.
+- **Asamblea Legislativa**: el sitio y la agenda la numeran igual que la 1ª
+  reunión (`reunion=1`). Por eso el `external_id` de sesión es
+  `{periodo}-{reunion}` o `{periodo}-A{reunion}`.
+- **BAT** (`bat.jsp?periodo=&reunion=&sesion=`):
+  - Si no hay boletín devuelve 200 con el wrapper vacío. Las asambleas no
+    tienen, y las reuniones sin número de sesión van con `sesion=0`.
+  - Se corrige después de publicado, así que cada corrida **reemplaza** los
+    asuntos de la sesión.
+  - `clave` = expediente principal, si no hay `OD-n`, si no hay `#orden`.
+- **Agenda de comisiones (las dos cámaras)**:
+  - Una reunión suspendida o reprogramada desaparece de la página. Después del
+    upsert se borran las **futuras** de los días mostrados que ya no figuran.
+    Con la agenda vacía no se borra nada (lo avisa el warn).
+  - En Diputados el `reunId` viene en un `<a>` **comentado**, y
+    `prosecretaria=secparl` es una sesión de recinto, no una comisión.
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.
