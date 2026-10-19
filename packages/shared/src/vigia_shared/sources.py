@@ -108,6 +108,40 @@ SOURCES: dict[str, dict] = {
         # No crea normas (actualiza estado de PROYECTO): sin SLO propio.
         "freshness_slo_days": None,
     },
+    # Congreso — Diputados. Escriben en tablas propias (no en norma) y hay
+    # recesos: el SLO por MAX(fecha_publicacion) no aplica, vale la cadencia.
+    "hcdn_sesiones": {
+        "code": "hcdn_sesiones",
+        "name": "HCDN — Sesiones de la Cámara de Diputados",
+        "kind": "feed",
+        "base_url": "https://datos.hcdn.gob.ar",
+        "cadence_hours": 24,
+        "freshness_slo_days": None,
+    },
+    "hcdn_asuntos": {
+        "code": "hcdn_asuntos",
+        "name": "HCDN — Boletín de Asuntos Tratados (resultados por expediente)",
+        "kind": "scrape",
+        "base_url": "https://www.hcdn.gob.ar",
+        "cadence_hours": 24,
+        "freshness_slo_days": None,
+    },
+    "hcdn_agenda": {
+        "code": "hcdn_agenda",
+        "name": "HCDN — Agenda de comisiones",
+        "kind": "scrape",
+        "base_url": "https://www.hcdn.gob.ar",
+        "cadence_hours": 12,
+        "freshness_slo_days": None,
+    },
+    "hcdn_legisladores": {
+        "code": "hcdn_legisladores",
+        "name": "HCDN — Diputados en funciones",
+        "kind": "feed",
+        "base_url": "https://datos.hcdn.gob.ar",
+        "cadence_hours": 168,
+        "freshness_slo_days": None,
+    },
     "bcra_comunicaciones": {
         "code": "bcra_comunicaciones",
         "name": "BCRA — Comunicaciones A (normativa cambiaria y financiera)",
