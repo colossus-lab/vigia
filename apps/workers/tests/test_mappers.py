@@ -170,3 +170,14 @@ def test_comunicacion_to_row_shape():
     assert row["organismo"].startswith("Banco Central")
     assert len(row["resumen"]) <= 1500  # excerpt para FTS, no el body entero
     assert row["raw"]["numero"] == 8445  # cursor incremental lee de acá
+
+
+def test_backfill_de_senado_exige_notify_false():
+    # Un backfill crea normas en masa: con notify=True saldría un mail por cada
+    # proyecto histórico que matchee una alerta (ya pasó con CABA/PBA).
+    import pytest
+
+    from vigia_workers.tasks import ingest_senado_proyectos
+
+    with pytest.raises(ValueError, match="notify=False"):
+        ingest_senado_proyectos(anio_desde=2008)

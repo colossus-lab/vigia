@@ -144,6 +144,34 @@ def parse_detalle(html: str) -> dict:
     return {"fecha": fecha, "autores": autores}
 
 
+# Tope duro de páginas por búsqueda: el corte normal es la primera página vacía,
+# esto es por si el sitio cambia y empieza a repetir la última.
+_MAX_PAGINAS = 1000
+
+
+def form_busqueda(
+    tipo_codigo: str, *, origen: str = "", anio: int | None = None, token: str = ""
+) -> dict[str, str]:
+    """Campos del POST de la búsqueda avanzada.
+
+    `expedienteLugar` filtra por origen (S, PE, JGM, OV, CD...) y
+    `expedienteNumeroPos` por año del expediente (2026, 2025...).
+    """
+    return {
+        "busqueda_proyectos[palabra]": "",
+        "busqueda_proyectos[opcion]": "1",
+        "busqueda_proyectos[palabra2]": "",
+        "busqueda_proyectos[expedienteTipo]": tipo_codigo,
+        "busqueda_proyectos[autor]": "",
+        "busqueda_proyectos[comision]": "",
+        "busqueda_proyectos[tipoDocumento]": "",
+        "busqueda_proyectos[expedienteLugar]": origen,
+        "busqueda_proyectos[expedienteNumeroPre]": "",
+        "busqueda_proyectos[expedienteNumeroPos]": str(anio) if anio else "",
+        "busqueda_proyectos[_token]": token,
+    }
+
+
 class SenadoClient:
     """Cliente async del buscador del Senado (mantiene token CSRF + cookie de sesión)."""
 
@@ -170,25 +198,32 @@ class SenadoClient:
         m = _RE_TOKEN.search(r.text)
         self._token = m.group(1) if m else None
 
-    async def buscar(self, tipo_codigo: str, page: int = 1) -> list[SenadoProyecto]:
-        """Una página de resultados para un tipo. page=1 hace el POST; >1 pagina."""
+    async def buscar(
+        self, tipo_codigo: str, page: int = 1, *, origen: str = "", anio: int | None = None
+    ) -> list[SenadoProyecto]:
+        """Una página de resultados. page=1 hace el POST con el filtro; >1 pagina
+        (el filtro queda en la sesión, así que las búsquedas van de a una)."""
         if page <= 1:
             await self._ensure_token()
-            data = {
-                "busqueda_proyectos[palabra]": "",
-                "busqueda_proyectos[opcion]": "1",
-                "busqueda_proyectos[palabra2]": "",
-                "busqueda_proyectos[expedienteTipo]": tipo_codigo,
-                "busqueda_proyectos[autor]": "",
-                "busqueda_proyectos[comision]": "",
-                "busqueda_proyectos[tipoDocumento]": "",
-                "busqueda_proyectos[expedienteLugar]": "",
-                "busqueda_proyectos[_token]": self._token or "",
-            }
+            data = form_busqueda(tipo_codigo, origen=origen, anio=anio, token=self._token or "")
             r = await self._client.post(_BUSCAR, data=data)
         else:
             r = await self._client.get(_BUSCAR, params={"page": page})
         return parse_listado(r.text)
+
+    async def _buscar_paginas(
+        self, tipo_codigo: str, origen: str, *, anio: int | None, max_pages: int | None
+    ) -> list[SenadoProyecto]:
+        """Todas las páginas de una búsqueda, hasta `max_pages` o hasta que venga una
+        vacía (el sitio devuelve 200 con la tabla vacía después de la última)."""
+        tope = min(max_pages or _MAX_PAGINAS, _MAX_PAGINAS)
+        out: list[SenadoProyecto] = []
+        for page in range(1, tope + 1):
+            items = await self.buscar(tipo_codigo, page, origen=origen, anio=anio)
+            if not items:
+                break
+            out.extend(items)
+        return out
 
     async def fetch_detalle(self, p: SenadoProyecto) -> None:
         # Un detalle flaky (el sitio del Senado es lento/inestable desde el EC2 y
@@ -205,30 +240,58 @@ class SenadoClient:
         except Exception:
             return
 
+    async def _buscar(
+        self,
+        *,
+        tipos: tuple[str, ...],
+        origenes: tuple[str, ...],
+        anio: int | None,
+        max_pages: int | None,
+        con_detalle: bool,
+    ) -> list[SenadoProyecto]:
+        vistos: dict[str, SenadoProyecto] = {}
+        for tc in tipos:
+            for origen in origenes:
+                for p in await self._buscar_paginas(tc, origen, anio=anio, max_pages=max_pages):
+                    # El filtro del sitio ya acota el origen; esto es por las dudas.
+                    if p.origen in origenes:
+                        vistos[p.external_id] = p
+        proyectos = list(vistos.values())
+        if con_detalle and proyectos:
+            await asyncio.gather(*(self.fetch_detalle(p) for p in proyectos))
+        return proyectos
+
     async def fetch_recientes(
         self,
         *,
         tipos: tuple[str, ...] = TIPOS_PROYECTO,
         max_pages: int = 3,
-        solo_origen: tuple[str, ...] | None = ORIGENES_INGESTA,
+        origenes: tuple[str, ...] = ORIGENES_INGESTA,
         con_detalle: bool = True,
     ) -> list[SenadoProyecto]:
-        """Proyectos recientes (páginas iniciales = números más altos) por tipo.
+        """Proyectos recientes: las primeras páginas de cada tipo, **origen por origen**.
 
-        `solo_origen` deja afuera los venidos de Diputados (ya en HCDN).
-        El upsert idempotente hace barato re-traer las primeras páginas a diario.
+        Una búsqueda sin filtro de origen devuelve todo mezclado y lo dominan los
+        de origen S (~2.000-6.000 por año contra ~50-90 del Ejecutivo): con 3
+        páginas, los PE recientes no aparecían nunca. Filtrando por origen, cada
+        uno trae sus propias páginas. El upsert idempotente hace barato re-traer
+        las primeras páginas a diario.
         """
-        vistos: dict[str, SenadoProyecto] = {}
-        for tc in tipos:
-            for page in range(1, max_pages + 1):
-                items = await self.buscar(tc, page)
-                if not items:
-                    break
-                for p in items:
-                    if solo_origen and p.origen not in solo_origen:
-                        continue
-                    vistos[p.external_id] = p
-        proyectos = list(vistos.values())
-        if con_detalle and proyectos:
-            await asyncio.gather(*(self.fetch_detalle(p) for p in proyectos))
-        return proyectos
+        return await self._buscar(
+            tipos=tipos, origenes=origenes, anio=None, max_pages=max_pages, con_detalle=con_detalle
+        )
+
+    async def fetch_anio(
+        self,
+        anio: int,
+        *,
+        tipos: tuple[str, ...] = TIPOS_PROYECTO,
+        origenes: tuple[str, ...] = ORIGENES_INGESTA,
+        con_detalle: bool = True,
+    ) -> list[SenadoProyecto]:
+        """Todos los proyectos de un año (por año del expediente), sin tope de
+        páginas: es para backfill. Medido 2026-10: S trae ~2.000-6.500 por año y
+        PE ~50-90, a ~0,9 s por página."""
+        return await self._buscar(
+            tipos=tipos, origenes=origenes, anio=anio, max_pages=None, con_detalle=con_detalle
+        )
