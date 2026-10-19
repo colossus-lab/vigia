@@ -624,19 +624,22 @@ def reuniones_a_dar_de_baja(
     de la agenda pero seguiría en la base como si se fuera a hacer. Se da de baja
     una guardada si las tres cosas son ciertas:
     - todavía no pasó (`fecha_hora >= ahora`): el pasado no se toca;
-    - su día (hora argentina) es uno de los que trajo la agenda: de los días que
-      la página no muestra no sabemos nada;
+    - su día (hora argentina) no es posterior al último que trae la agenda. La
+      página lista todas las reuniones próximas hasta ese día, así que un día
+      del medio sin reuniones es un día sin reuniones, no uno que no conocemos:
+      el caso típico es el jueves que tenía una sola reunión y se suspendió, que
+      desaparece entero de la página. Lo posterior al último día sí es desconocido;
     - su `external_id` no está entre las scrapeadas.
 
     Con la agenda vacía no se da de baja nada (para eso está el `warn`).
     """
     if not scrapeadas:
         return []
-    dias = {r["fecha_hora"].astimezone(ART).date() for r in scrapeadas}
+    ultimo_dia = max(r["fecha_hora"].astimezone(ART).date() for r in scrapeadas)
     vigentes = {r["external_id"] for r in scrapeadas}
     return [
         eid for eid, fh in guardadas
-        if fh >= ahora and fh.astimezone(ART).date() in dias and eid not in vigentes
+        if fh >= ahora and fh.astimezone(ART).date() <= ultimo_dia and eid not in vigentes
     ]
 
 

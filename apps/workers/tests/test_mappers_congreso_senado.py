@@ -214,12 +214,33 @@ def test_reuniones_a_dar_de_baja():
         ("reprogramada", datetime(2026, 10, 21, 10, 0, tzinfo=ART)),  # mismo día, ya no figura
         ("suspendida", datetime(2026, 10, 20, 15, 0, tzinfo=ART)),
         ("ya_paso", datetime(2026, 10, 20, 9, 0, tzinfo=ART)),   # hoy, pero antes de ahora
-        ("otro_dia", datetime(2026, 10, 22, 10, 0, tzinfo=ART)), # día que la agenda no mostró
-        # 02:00 UTC del 21 = 23:00 ART del 20: cuenta como día 20 (hora argentina).
-        ("utc", datetime(2026, 10, 21, 2, 0, tzinfo=timezone.utc)),
+        ("otro_dia", datetime(2026, 10, 22, 10, 0, tzinfo=ART)), # después del último día scrapeado
+        # 02:00 UTC del 22 = 23:00 ART del 21: es del día 21 (hora argentina), no del 22.
+        ("utc", datetime(2026, 10, 22, 2, 0, tzinfo=timezone.utc)),
     ]
     assert reuniones_a_dar_de_baja(guardadas, scrapeadas, ahora=ahora) == [
         "reprogramada", "suspendida", "utc",
     ]
     # Agenda vacía: no se borra nada.
     assert reuniones_a_dar_de_baja(guardadas, [], ahora=ahora) == []
+
+
+def test_reuniones_a_dar_de_baja_dia_del_medio_sin_reuniones():
+    """El jueves tenía una sola reunión y se suspendió: el jueves desaparece entero
+    de la página, pero la agenda llega hasta el viernes, así que es un día sin
+    reuniones y la fila fantasma se da de baja."""
+    ahora = datetime(2026, 10, 19, 9, 0, tzinfo=ART)  # lunes
+
+    def r(eid, d):
+        return {"external_id": eid, "fecha_hora": datetime(2026, 10, d, 11, 0, tzinfo=ART)}
+
+    scrapeadas = [r("martes", 20), r("viernes", 23)]
+    guardadas = [
+        ("martes", datetime(2026, 10, 20, 11, 0, tzinfo=ART)),
+        ("jueves_suspendida", datetime(2026, 10, 22, 11, 0, tzinfo=ART)),
+        ("lunes_hoy_suspendida", datetime(2026, 10, 19, 15, 0, tzinfo=ART)),  # hoy, sin reuniones scrapeadas hoy
+        ("semana_que_viene", datetime(2026, 10, 26, 11, 0, tzinfo=ART)),       # después del último día: no se sabe
+    ]
+    assert reuniones_a_dar_de_baja(guardadas, scrapeadas, ahora=ahora) == [
+        "jueves_suspendida", "lunes_hoy_suspendida",
+    ]
