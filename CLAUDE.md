@@ -19,7 +19,7 @@ apps/web/       Next.js 16 App Router (JSX, no TS) — tema OpenArg dark + palet
 apps/workers/   Celery (vigia_workers) — tasks de ingesta + matching de alertas + beat schedule
 packages/shared/      modelos SQLAlchemy + schemas Pydantic + constantes (vigia_shared)
 packages/connectors/  InfoLEG + HCDN (vigia_connectors)
-db/alembic/     migraciones (0001 inicial … 0010 api_key, 0011 créditos)
+db/alembic/     migraciones (0001 inicial … 0011 créditos, 0012 congreso)
 infra/          Caddyfile, ec2-user-data.sh, DEPLOY.md (runbook completo)
 ```
 
@@ -209,6 +209,77 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   al web implica agregarlo a mano en `app/api/vigia/[...path]/route.js` (un rewrite
   `:path*` ya se removió una vez por dejar un proxy abierto en Vercel). `/api-keys`
   ya está en la allowlist y su UI vive en `app/(app)/settings/api/page.jsx`.
+- **Congreso: lo que PASA no entra a `norma`.** Votaciones, sesiones, asuntos
+  tratados y agenda de comisiones van en tablas propias (migración 0012), igual
+  que `aviso_societario`. El cruce con los proyectos es por **expediente
+  canónico** `NNNN-ORIGEN-AAAA` (`vigia_shared/expedientes.py`): `text[]` con GIN
+  en las dos puntas y solapamiento `&&`, porque un proyecto tiene un expediente
+  **por cámara** (entra por Diputados como `0010-PE-2026` y en el Senado es
+  `CD-12/26`). Si una forma nueva no normaliza, el cruce no falla: no encuentra
+  nada — por eso cada forma vista en una fuente real va como caso de test.
+  `norma.expedientes` lo llenan solo los mappers de proyectos y `upsert_normas`
+  lo actualiza solo si el batch lo trae (las demás fuentes no lo vacían).
+  Histórico: `backfill_expedientes` (su `sin_expediente` delata formas que el
+  normalizador no reconoce).
+- **`senado_proyectos` ingiere orígenes S/PE/JGM/OV, no solo S** (desde 0012):
+  sin PE las votaciones del Senado sobre proyectos del Ejecutivo no tenían con
+  qué cruzarse. `CD` sigue afuera (ya entra por HCDN). Un backfill con
+  `max_pages` alto crea normas en masa → `notify=False`.
+- **Voto nominal de Diputados: `votaciones.hcdn.gob.ar` tiene reCAPTCHA v3 y NO
+  se esquiva.** El dataset CKAN `votaciones_nominales` se cortó en feb-2020. Para
+  Diputados se usan resultados por expediente (Boletín de Asuntos Tratados); el
+  Senado sí tiene voto nominal en HTML (`/votaciones/detalleActa/{id}`).
+- **Diputados en CKAN (`congreso_hcdn.py`)**:
+  - **La "Composición Actual" no trae ID.** El ID `HCDNnnnn` sale del recurso
+    "Diputados" (histórico, una fila por mandato y por bloque) y se cruza por
+    apellido + distrito **del mandato vigente**: el distrito cambia entre
+    mandatos. Para elegir entre varios CSV del mismo package:
+    `resolve_csv_url(package, recurso=...)`.
+  - **Las fechas del CSV `sesiones` vienen 2 días antes** que las del sitio y
+    del BAT (huele a epoch de Excel). `combinar_sesiones` mide el desfase en
+    cada corrida y lo aplica, y la fecha que se guarda es la del sitio.
+- **Asamblea Legislativa**: el sitio y la agenda la numeran igual que la 1ª
+  reunión (`reunion=1`). Por eso el `external_id` de sesión es
+  `{periodo}-{reunion}` o `{periodo}-A{reunion}`.
+- **BAT** (`bat.jsp?periodo=&reunion=&sesion=`):
+  - Si no hay boletín devuelve 200 con el wrapper vacío. Las asambleas no
+    tienen, y las reuniones sin número de sesión van con `sesion=0`.
+  - Se corrige después de publicado, así que cada corrida **reemplaza** los
+    asuntos de la sesión.
+  - `clave` = expediente principal, si no hay `OD-n`, si no hay `#orden`.
+- **Agenda de comisiones (las dos cámaras)**:
+  - Una reunión suspendida o reprogramada desaparece de la página. Después del
+    upsert se borran las **futuras** de los días mostrados que ya no figuran.
+    Con la agenda vacía no se borra nada (lo avisa el warn).
+  - En Diputados el `reunId` viene en un `<a>` **comentado**, y
+    `prosecretaria=secparl` es una sesión de recinto, no una comisión.
+  - **Días cubiertos = de hoy al último día que muestra la página**, no solo
+    los que tienen reuniones. Si un día tenía una sola reunión y se suspendió,
+    desaparece entero de la página, y contando solo los días que figuran esa
+    reunión quedaría como fantasma.
+  - La agenda del Senado no trae año: lo infiere `inferir_fecha`, con el día
+    de la semana como desempate, y cubre el cruce de diciembre a enero.
+- **Votaciones del Senado (`congreso_senado.py`)**:
+  - **Las actas solo linkean a los senadores EN FUNCIONES.** Los ex senadores
+    vienen sin ID: en un acta de 2008, 71 de 72 filas. Se resuelven por
+    nombre + provincia + **fecha** contra `ExportarListadoSenadoresHistorico`
+    (`IndiceSenadores`). La fecha desempata homónimos de épocas distintas. Si
+    no aparecen, entran con `external_id = nom-<hash>` y el voto no se pierde.
+  - **Los IDs de acta no son cronológicos**, y un ID inexistente devuelve 200
+    con la plantilla vacía. Mismo error que con el BORA: los IDs no dicen
+    nada de fechas ni de completitud.
+  - **La fecha del acta es la de la sesión, con la hora de la votación.** Una
+    votación de las 02:29 queda con el día en que empezó la sesión. Hay
+    excepciones con el acta fechada al día siguiente, y por eso
+    `_vincular_sesiones` cae a la sesión del día anterior.
+  - `POST /votaciones/actas` con `busqueda_actas[anio]` **no** pide CSRF (el
+    buscador de proyectos sí).
+  - Hay actas con celdas de voto vacías **en el propio sitio** (la 2530 tiene
+    62 de 72). Quedan como `otro`: no es un bug del parser.
+  - `congreso_sesion.periodo` del Senado queda NULL: las extraordinarias de
+    enero y febrero son del período anterior y el sitio no lo dice.
+  - El JSON de datos abiertos del Senado puede traer comas colgantes:
+    `cargar_json_tolerante`.
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.

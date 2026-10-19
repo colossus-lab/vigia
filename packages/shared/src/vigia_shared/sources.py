@@ -53,6 +53,42 @@ SOURCES: dict[str, dict] = {
         # mantienen vía last_status y cadence_hours.
         "freshness_slo_days": None,
     },
+    # Actividad del Senado (vigia_workers.congreso_senado) → tablas del Congreso,
+    # NO `norma`. Sin SLO de frescura en ninguna: el SLO mide
+    # MAX(norma.fecha_publicacion), que no aplica a estas tablas, y además hay
+    # recesos. Lo que vigila que estén vivas es last_status + cadence_hours.
+    "senado_votaciones": {
+        "code": "senado_votaciones",
+        "name": "Senado — Actas de votación y voto nominal",
+        "kind": "scrape",
+        "base_url": "https://www.senado.gob.ar/votaciones/actas",
+        "cadence_hours": 12,
+        "freshness_slo_days": None,
+    },
+    "senado_agenda": {
+        "code": "senado_agenda",
+        "name": "Senado — Agenda de comisiones",
+        "kind": "scrape",
+        "base_url": "https://www.senado.gob.ar/parlamentario/comisiones/",
+        "cadence_hours": 12,
+        "freshness_slo_days": None,
+    },
+    "senado_sesiones": {
+        "code": "senado_sesiones",
+        "name": "Senado — Sesiones (versiones taquigráficas y diarios)",
+        "kind": "scrape",
+        "base_url": "https://www.senado.gob.ar/parlamentario/sesiones/busquedaTac",
+        "cadence_hours": 24,
+        "freshness_slo_days": None,
+    },
+    "senado_legisladores": {
+        "code": "senado_legisladores",
+        "name": "Senado — Senadores (datos abiertos)",
+        "kind": "feed",
+        "base_url": "https://www.senado.gob.ar/micrositios/DatosAbiertos/",
+        "cadence_hours": 168,
+        "freshness_slo_days": None,
+    },
     "bora_primera": {
         "code": "bora_primera",
         "name": "Boletín Oficial — Primera Sección (edición del día)",
@@ -70,6 +106,40 @@ SOURCES: dict[str, dict] = {
         "base_url": "https://datos.hcdn.gob.ar",
         "cadence_hours": 24,
         # No crea normas (actualiza estado de PROYECTO): sin SLO propio.
+        "freshness_slo_days": None,
+    },
+    # Congreso — Diputados. Escriben en tablas propias (no en norma) y hay
+    # recesos: el SLO por MAX(fecha_publicacion) no aplica, vale la cadencia.
+    "hcdn_sesiones": {
+        "code": "hcdn_sesiones",
+        "name": "HCDN — Sesiones de la Cámara de Diputados",
+        "kind": "feed",
+        "base_url": "https://datos.hcdn.gob.ar",
+        "cadence_hours": 24,
+        "freshness_slo_days": None,
+    },
+    "hcdn_asuntos": {
+        "code": "hcdn_asuntos",
+        "name": "HCDN — Boletín de Asuntos Tratados (resultados por expediente)",
+        "kind": "scrape",
+        "base_url": "https://www.hcdn.gob.ar",
+        "cadence_hours": 24,
+        "freshness_slo_days": None,
+    },
+    "hcdn_agenda": {
+        "code": "hcdn_agenda",
+        "name": "HCDN — Agenda de comisiones",
+        "kind": "scrape",
+        "base_url": "https://www.hcdn.gob.ar",
+        "cadence_hours": 12,
+        "freshness_slo_days": None,
+    },
+    "hcdn_legisladores": {
+        "code": "hcdn_legisladores",
+        "name": "HCDN — Diputados en funciones",
+        "kind": "feed",
+        "base_url": "https://datos.hcdn.gob.ar",
+        "cadence_hours": 168,
         "freshness_slo_days": None,
     },
     "bcra_comunicaciones": {

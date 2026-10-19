@@ -32,6 +32,7 @@ from vigia_connectors.emisores import detect_emisor
 from sqlalchemy import text
 
 from vigia_shared.db import session_scope
+from vigia_shared.expedientes import expedientes_de
 from vigia_shared.sources import catalog_fields
 from vigia_workers.ai_resumen import aplicar_resumen_ia
 from vigia_workers.celery_app import celery_app
@@ -148,6 +149,8 @@ def _proyecto_to_row(p: HcdnProyecto) -> dict[str, Any]:
         "entidades": [p.autor] if p.autor else None,
         "tags": [p.tipo_proyecto.lower()] if p.tipo_proyecto else None,
         "url": None,
+        # Uno por cámara: es lo que cruza el proyecto con votaciones y agenda.
+        "expedientes": expedientes_de(p.exp_diputados, p.exp_senado),
         "raw": {k: (v.isoformat() if isinstance(v, date) else v)
                 for k, v in dataclasses.asdict(p).items()},
     }
@@ -218,6 +221,7 @@ def _senado_to_row(p: SenadoProyecto) -> dict[str, Any]:
         "entidades": p.autores or None,
         "tags": [p.tipo_proyecto] if p.tipo_proyecto else None,
         "url": p.url,
+        "expedientes": expedientes_de(p.external_id),
         "raw": {
             "numero": p.numero, "anio": p.anio, "tipo_codigo": p.tipo_codigo,
             "origen": p.origen, "autores": p.autores,
@@ -228,10 +232,14 @@ def _senado_to_row(p: SenadoProyecto) -> dict[str, Any]:
 
 @celery_app.task(name="vigia_workers.tasks.ingest_senado_proyectos")
 def ingest_senado_proyectos(dry_run: bool = False, max_pages: int = 3, notify: bool = True) -> dict[str, Any]:
-    """Ingesta proyectos recientes originados en el Senado (scrape del buscador HSN).
+    """Ingesta proyectos recientes que ingresan por el Senado (scrape del buscador HSN).
 
-    Solo origen=S (los venidos de Diputados ya están en hcdn_proyectos). Upsert
-    idempotente por external_id = '{numero}/{anio}-{origen}-{tipo}'.
+    Orígenes S/PE/JGM/OV (`ORIGENES_INGESTA`); los venidos de Diputados ya están
+    en hcdn_proyectos. Upsert idempotente por external_id =
+    '{numero}/{anio}-{origen}-{tipo}'.
+
+    ⚠️ Un backfill con `max_pages` alto crea normas nuevas en masa: correrlo con
+    `notify=False` o sale un mail de alerta por cada match.
     """
     dry = _is_dry_run(dry_run)
     SOURCE = catalog_fields("senado_proyectos")
@@ -846,5 +854,56 @@ def backfill_emisores() -> dict[str, Any]:
                     )
                     updated += len(payload)
         return {"scanned": scanned, "updated": updated}
+
+    return run_async(_run())
+
+
+@celery_app.task(name="vigia_workers.tasks.backfill_expedientes")
+def backfill_expedientes() -> dict[str, Any]:
+    """Rellena `norma.expedientes` en los PROYECTO históricos (migración 0012).
+
+    La ingesta nueva ya lo setea; esto cubre lo que entró antes. Idempotente:
+    solo toca filas con el array vacío, paginando por id como `backfill_emisores`.
+    Re-correrla reescanea los que no normalizaron (barato) — y el conteo de
+    `sin_expediente` es la señal de que el normalizador no reconoce alguna forma.
+
+    No crea normas, así que no dispara alertas.
+    """
+    async def _run() -> dict[str, Any]:
+        scanned = updated = 0
+        last_id = 0
+        async with session_scope() as session:
+            while True:
+                rows = (
+                    await session.execute(
+                        text(
+                            "SELECT n.id, s.code, n.external_id, "
+                            "       n.raw->>'exp_diputados', n.raw->>'exp_senado' "
+                            "FROM norma n JOIN source_catalog s ON s.id = n.source_id "
+                            "WHERE n.tipo = 'PROYECTO' AND n.expedientes = '{}' AND n.id > :last "
+                            "  AND s.code IN ('hcdn_proyectos', 'senado_proyectos') "
+                            "ORDER BY n.id LIMIT 5000"
+                        ),
+                        {"last": last_id},
+                    )
+                ).all()
+                if not rows:
+                    break
+                scanned += len(rows)
+                last_id = rows[-1][0]
+                payload = []
+                for nid, code, ext, exp_d, exp_s in rows:
+                    exps = (
+                        expedientes_de(exp_d, exp_s) if code == "hcdn_proyectos"
+                        else expedientes_de(ext)
+                    )
+                    if exps:
+                        payload.append({"id": nid, "exps": exps})
+                if payload:
+                    await session.execute(
+                        text("UPDATE norma SET expedientes = :exps WHERE id = :id"), payload
+                    )
+                    updated += len(payload)
+        return {"scanned": scanned, "updated": updated, "sin_expediente": scanned - updated}
 
     return run_async(_run())

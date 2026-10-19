@@ -6,9 +6,11 @@ dataset de proyectos: hay que scrapear el buscador Symfony de
 CSRF + cookie de sesión) → POST la búsqueda avanzada → GET `?page=N` para paginar
 (el filtro persiste en la sesión) → GET el detalle por expediente para fecha+autores.
 
-Para no duplicar lo que ya trae el connector HCDN, por defecto solo se ingieren
-los expedientes originados en el Senado (`origen == "S"`); los venidos de Diputados
-(`CD`) ya están cubiertos por `hcdn_proyectos`.
+Para no duplicar lo que ya trae el connector HCDN se dejan afuera los venidos de
+Diputados (`CD`), que ya están en `hcdn_proyectos`. Sí entran los que ingresan por
+el Senado desde el Ejecutivo (`PE`, `JGM`) u oficiales varios (`OV`): sin ellos las
+votaciones del Senado sobre proyectos del Ejecutivo (p.ej. `PE-159/25-PL`) no
+tienen contra qué cruzarse. Ver `ORIGENES_INGESTA`.
 """
 from __future__ import annotations
 
@@ -29,6 +31,10 @@ _BUSCAR = "/parlamentario/parlamentaria/avanzada"
 
 # Tipos de expediente que son "proyectos" (el resto: mensajes, acuerdos, etc.).
 TIPOS_PROYECTO = ("PL", "PR", "PD", "PC", "DE")
+# Orígenes que se ingieren. Afuera: `CD` (ya en hcdn_proyectos) y `P`
+# (particulares: peticiones, no proyectos de legisladores ni del Ejecutivo).
+ORIGENES_INGESTA = ("S", "PE", "JGM", "OV")
+
 _TIPO_NOMBRE = {
     "PL": "ley", "PR": "resolución", "PD": "declaración",
     "PC": "comunicación", "DE": "decreto",
@@ -204,12 +210,12 @@ class SenadoClient:
         *,
         tipos: tuple[str, ...] = TIPOS_PROYECTO,
         max_pages: int = 3,
-        solo_origen: tuple[str, ...] | None = ("S",),
+        solo_origen: tuple[str, ...] | None = ORIGENES_INGESTA,
         con_detalle: bool = True,
     ) -> list[SenadoProyecto]:
         """Proyectos recientes (páginas iniciales = números más altos) por tipo.
 
-        `solo_origen=("S",)` deja afuera los venidos de Diputados (ya en HCDN).
+        `solo_origen` deja afuera los venidos de Diputados (ya en HCDN).
         El upsert idempotente hace barato re-traer las primeras páginas a diario.
         """
         vistos: dict[str, SenadoProyecto] = {}

@@ -14,11 +14,13 @@ celery_app = Celery(
     backend=REDIS_URL,
     include=[
         "vigia_workers.tasks",
+        "vigia_workers.congreso_senado",
         "vigia_workers.alerts",
         "vigia_workers.freshness",
         "vigia_workers.reconcile",
         "vigia_workers.bicameral",
         "vigia_workers.movimientos",
+        "vigia_workers.congreso_hcdn",
         "vigia_workers.societario",
         "vigia_workers.maintenance",
     ],
@@ -82,12 +84,70 @@ celery_app.conf.update(
             "task": "vigia_workers.movimientos.ingest_hcdn_movimientos",
             "schedule": crontab(hour=8, minute=30),
         },
-        # Senado — proyectos recientes (scrape del buscador HSN). Solo origen=S
-        # (los de Diputados ya entran por hcdn-proyectos). Fuera de la ventana
+        # Congreso — Diputados (tablas propias, no norma). Todo DESPUÉS de la
+        # ventana de proyectos/movimientos (08:00–08:30), sin competir con ella.
+        # Agenda de comisiones (semana en curso): mañana y tarde.
+        "ingest-hcdn-agenda": {
+            "task": "vigia_workers.congreso_hcdn.ingest_hcdn_agenda",
+            "schedule": crontab(hour=8, minute=40),
+        },
+        "ingest-hcdn-agenda-tarde": {
+            "task": "vigia_workers.congreso_hcdn.ingest_hcdn_agenda",
+            "schedule": crontab(hour=18, minute=10),
+        },
+        # Sesiones (CKAN + listado del sitio) y, después, sus asuntos tratados:
+        # asuntos necesita la sesión cargada para la FK.
+        "ingest-hcdn-sesiones": {
+            "task": "vigia_workers.congreso_hcdn.ingest_hcdn_sesiones",
+            "schedule": crontab(hour=9, minute=40),
+        },
+        "ingest-hcdn-asuntos": {
+            "task": "vigia_workers.congreso_hcdn.ingest_hcdn_asuntos",
+            "schedule": crontab(hour=9, minute=50),
+        },
+        # Diputados en funciones — semanal, lunes 06:15 (fuera de toda ventana).
+        "ingest-hcdn-legisladores": {
+            "task": "vigia_workers.congreso_hcdn.ingest_hcdn_legisladores",
+            "schedule": crontab(day_of_week=1, hour=6, minute=15),
+        },
+        # Senado — proyectos recientes (scrape del buscador HSN). Orígenes
+        # S/PE/JGM/OV (los venidos de Diputados ya entran por hcdn-proyectos). Fuera de la ventana
         # HCDN (08:00–08:30) para no competir por el worker.
         "ingest-senado-proyectos": {
             "task": "vigia_workers.tasks.ingest_senado_proyectos",
             "schedule": crontab(hour=8, minute=45),
+        },
+        # Senado — actividad (vigia_workers.congreso_senado) → tablas del Congreso.
+        # Votaciones dos veces: las sesiones terminan de madrugada y el acta se
+        # carga a la mañana; la de la noche toma las de una sesión diurna.
+        "ingest-senado-votaciones": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_votaciones",
+            "schedule": crontab(hour=7, minute=30),
+        },
+        "ingest-senado-votaciones-noche": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_votaciones",
+            "schedule": crontab(hour=23, minute=30),
+        },
+        # Agenda de comisiones: a la mañana y a la tarde (se cargan reuniones
+        # durante el día para los días siguientes).
+        "ingest-senado-agenda": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_agenda",
+            "schedule": crontab(hour=8, minute=50),
+        },
+        "ingest-senado-agenda-tarde": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_agenda",
+            "schedule": crontab(hour=18, minute=0),
+        },
+        # Sesiones: después de votaciones, así `_vincular_sesiones` engancha
+        # las votaciones de la madrugada con su sesión.
+        "ingest-senado-sesiones": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_sesiones",
+            "schedule": crontab(hour=9, minute=10),
+        },
+        # Senadores en ejercicio + ex senadores — semanal, lunes 06:00 ART.
+        "ingest-senado-legisladores": {
+            "task": "vigia_workers.congreso_senado.ingest_senado_legisladores",
+            "schedule": crontab(day_of_week=1, hour=6, minute=0),
         },
         # Dictámenes de la Comisión Bicameral DNU (HCDN CKAN) — diario.
         # Después de hcdn-proyectos (08:00): el join usa los proyectos del día.
