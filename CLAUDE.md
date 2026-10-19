@@ -165,6 +165,20 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
   - El saldo viaja *piggyback* en `GET /workspaces/me` — sin endpoint propio y sin tocar la
     allowlist del BFF.
 - **Alertas por-sector**: una alerta es válida con `keywords` **O** `sectores` (422 `criterio_vacio` solo si ambos vacíos). Sin keywords, el matcher filtra solo por `sector = ANY(...)` — sin el filtro FTS. `POST /alerts/preview` estima el volumen (normas de los últimos 30 días) reusando esa misma lógica.
+- **El matcher mira DOS fechas**: `ingested_at >= anchor_at` (que la norma
+  haya entrado después de crear la alerta) **y** `fecha_publicacion` dentro de
+  `VENTANA_FECHA_DIAS` (120) o nula. Sin la segunda, una carga histórica
+  (backfill, o InfoLEG digitalizando una ley de 1964) entraba "nueva" y
+  matcheaba como noticia.
+  - Las dos razones de la segunda condición:
+    - `notify=False` evita el mail, pero el match queda en la app como si
+      fuera de hoy.
+    - El match marcado es lo único que impide que el matcher siguiente vuelva
+      a encontrar esa norma. Sin la ventana, **borrar matches históricos los
+      hace volver, y esa vez con mail**.
+  - 120 d sale de la demora fecha→carga medida en prod: p99 de 35 d en
+    InfoLEG, 89 d en HCDN (baches del dataset) y ≤ 7 d en los boletines. Si
+    entra una fuente con más demora, hay que medirla antes de ajustar.
 - **`/v1` es contrato con terceros; los routers sin prefijo son del web.** Leen la
   misma tabla y son dos superficies distintas a propósito: `vigia_shared.schemas`
   se mueve cuando el web necesita un campo, y si `/v1` reusara esos modelos un

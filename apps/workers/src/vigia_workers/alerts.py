@@ -24,6 +24,22 @@ from vigia_workers.notifications import render_digest, render_sin_creditos, send
 from vigia_workers.persistence import run_async
 
 
+# Una norma cuya fecha propia es más vieja que esto no dispara alertas, aunque
+# se haya cargado hoy. El ancla de la alerta mira `ingested_at` (cuándo entró a
+# Vigía), y eso no alcanza: una carga histórica (backfill de una fuente, o
+# InfoLEG digitalizando una ley de 1964) entra "nueva" y matchearía como si
+# fuera noticia. Antes eso lo cubría solo `notify=False`, que marca avisado pero
+# deja el match visible en la app como si fuera de hoy, y hace imposible borrar
+# esos matches: el matcher siguiente los volvería a encontrar y esa vez sí
+# mandaría el mail.
+#
+# 120 días, medido en prod (2026-10, cargas de los 4 meses previos): la demora
+# fecha→carga tiene p99 de 35 d en InfoLEG (ciclo mensual), 89 d en HCDN (el
+# dataset tiene baches de 6+ semanas), 27 d en Senado y ≤ 7 d en los boletines.
+# Las normas sin fecha siguen matcheando como siempre.
+VENTANA_FECHA_DIAS = 120
+
+
 async def _match_all(notify: bool = True) -> dict[str, Any]:
     """Matchea normas contra alertas activas.
 
@@ -64,7 +80,9 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
 
         for a in alertas:
             # OR entre keywords: una tsquery por keyword unidas con '||'.
-            params: dict[str, Any] = {"aid": a.id, "anchor": a.anchor_at}
+            params: dict[str, Any] = {
+                "aid": a.id, "anchor": a.anchor_at, "ventana": VENTANA_FECHA_DIAS,
+            }
             ts_parts = []
             for i, kw in enumerate(a.keywords or []):
                 ts_parts.append(f"plainto_tsquery('spanish', :kw{i})")
@@ -97,6 +115,8 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                         SELECT :aid, n.id, false
                         FROM norma n
                         WHERE n.ingested_at >= :anchor
+                          AND (n.fecha_publicacion IS NULL
+                               OR n.fecha_publicacion >= CURRENT_DATE - CAST(:ventana AS integer))
                           {ts_clause}
                           {sector_clause}
                           AND NOT EXISTS (
