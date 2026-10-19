@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from vigia_api.core.cache import cached
 from vigia_api.core.db import get_sessionmaker
+from vigia_api.routers.congreso import congreso_de_norma
 from vigia_shared.models import DnuTracking, Norma, SourceCatalog
 from vigia_shared.relevancia import PESO_TIPO, es_tramite
 from vigia_shared.schemas import NormaDetail, NormaListItem, NormaPage
@@ -194,12 +195,15 @@ async def get_norma(norma_id: int) -> NormaDetail:
                 .where(Norma.id == norma_id)
             )
         ).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Norma no encontrada")
-    norma, fuente, fuente_code = row
+        if row is None:
+            raise HTTPException(status_code=404, detail="Norma no encontrada")
+        norma, fuente, fuente_code = row
+        # Sin expedientes (todo lo que no es PROYECTO) no consulta nada.
+        congreso = await congreso_de_norma(session, norma.expedientes)
     detail = NormaDetail.model_validate(norma)
     detail.fuente = fuente
     detail.fuente_code = fuente_code
+    detail.congreso = congreso
     if isinstance(norma.raw, dict):
         movs = norma.raw.get("movimientos")
         if isinstance(movs, list) and movs:
