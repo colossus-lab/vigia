@@ -432,6 +432,31 @@ def agenda_vacia_sospechosa(n_reuniones: int, hoy: date) -> bool:
     return n_reuniones == 0 and hoy.weekday() <= 3 and not en_receso(hoy)
 
 
+# Una reunión suspendida o reprogramada desaparece de la agenda, y sin esto
+# quedaría en la tabla como si se fuera a hacer (y, si no tenía reunId, la
+# reprogramada entra con otro hash y la vieja queda duplicada). Solo se borra
+# el FUTURO de los días que la página mostró: el pasado ya no figura en la
+# agenda y no por eso dejó de pasar.
+_BAJAS_AGENDA_SQL = """
+DELETE FROM reunion_comision
+WHERE camara = :c
+  AND fecha_hora >= :ahora
+  AND (fecha_hora AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = ANY(:dias)
+  AND NOT (external_id = ANY(:ids))
+"""
+
+
+def bajas_agenda(dias: list[date], ids: list[str], ahora: datetime) -> dict[str, Any] | None:
+    """Parámetros de `_BAJAS_AGENDA_SQL`, o None si no hay que borrar nada.
+
+    Sin `dias` la página vino rota o vacía (eso ya lo avisa el warn de agenda
+    vacía): no se interpreta como "se suspendió todo".
+    """
+    if not dias:
+        return None
+    return {"c": CAMARA, "ahora": ahora, "dias": sorted(set(dias)), "ids": sorted(set(ids))}
+
+
 async def _ingest_agenda(dry: bool) -> dict[str, Any]:
     async with HcdnActividadClient() as web:
         agenda = await web.fetch_agenda()
@@ -450,6 +475,12 @@ async def _ingest_agenda(dry: bool) -> dict[str, Any]:
         ]
         return out
     await _upsert(ReunionComision, rows, ("camara", "external_id"))
+    out["bajas"] = 0
+    params = bajas_agenda(agenda.dias, [r["external_id"] for r in rows], datetime.now(ART))
+    if params is not None:
+        async with session_scope() as session:
+            res = await session.execute(text(_BAJAS_AGENDA_SQL), params)
+            out["bajas"] = res.rowcount or 0
     return out
 
 

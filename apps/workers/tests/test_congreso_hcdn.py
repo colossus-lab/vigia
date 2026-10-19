@@ -19,6 +19,7 @@ from vigia_workers.congreso_hcdn import (
     _reunion_to_row,
     _sesion_to_row,
     agenda_vacia_sospechosa,
+    bajas_agenda,
     sesiones_a_recorrer,
 )
 
@@ -103,3 +104,25 @@ def test_fuentes_registradas_sin_slo():
     for code in ("hcdn_sesiones", "hcdn_asuntos", "hcdn_agenda", "hcdn_legisladores"):
         assert SOURCES[code]["code"] == code
         assert SOURCES[code]["freshness_slo_days"] is None
+
+
+def test_bajas_agenda_sin_dias_no_borra_nada():
+    # Página rota o vacía: lo avisa el warn, no se lee como "se suspendió todo".
+    ahora = datetime(2026, 10, 20, 9, 0, tzinfo=ART)
+    assert bajas_agenda([], ["1365"], ahora) is None
+    assert bajas_agenda([], [], ahora) is None
+
+
+def test_bajas_agenda_parametros():
+    ahora = datetime(2026, 10, 20, 9, 0, tzinfo=ART)
+    dias = [date(2026, 10, 21), date(2026, 10, 20), date(2026, 10, 20)]
+    p = bajas_agenda(dias, ["1365", "1363", "1365"], ahora)
+    assert p == {
+        "c": "D",
+        "ahora": ahora,  # el pasado no se toca: ya no figura en la agenda
+        "dias": [date(2026, 10, 20), date(2026, 10, 21)],
+        "ids": ["1363", "1365"],
+    }
+    # Días con solo sesión de recinto: no quedó ninguna reunión de comisión,
+    # así que las futuras de esos días se dan de baja.
+    assert bajas_agenda([date(2026, 10, 21)], [], ahora)["ids"] == []
