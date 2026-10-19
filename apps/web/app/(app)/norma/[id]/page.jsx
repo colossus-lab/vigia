@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { TIPOS_NORMA } from '@/lib/constants';
 import { ArrowLeft, Clock, Building2, MapPin, Tag, ExternalLink, Database } from 'lucide-react';
 import FadeIn from '@/components/FadeIn';
+import EnElCongreso from '@/components/congreso/EnElCongreso';
 
 const TIPO_TINT = {
   DNU: 'tint-red', DECRETO: 'tint-amber', LEY: 'tint-green', RESOLUCION: 'tint-blue',
@@ -124,6 +126,19 @@ export default function NormDetailView() {
                 </div>
               ))}
             </div>
+          </section>
+        </FadeIn>
+      )}
+
+      {/* Cruce por expediente con lo que pasó en las cámaras: null si no hay. */}
+      {norma.congreso && (
+        <FadeIn delay={155}>
+          <section className="mb-10">
+            <p className="eyebrow mb-3"><span className="eyebrow-num">I·c</span><span className="ml-2">En el Congreso</span></p>
+            <EnElCongreso congreso={norma.congreso} />
+            <Link href="/congreso" className="textlink inline-flex items-center gap-1 text-[11px] mt-3">
+              Todo lo que pasa en el Congreso <span className="arrow">→</span>
+            </Link>
           </section>
         </FadeIn>
       )}
