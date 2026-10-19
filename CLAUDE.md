@@ -253,6 +253,33 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
     Con la agenda vacía no se borra nada (lo avisa el warn).
   - En Diputados el `reunId` viene en un `<a>` **comentado**, y
     `prosecretaria=secparl` es una sesión de recinto, no una comisión.
+  - **Días cubiertos = de hoy al último día que muestra la página**, no solo
+    los que tienen reuniones. Si un día tenía una sola reunión y se suspendió,
+    desaparece entero de la página, y contando solo los días que figuran esa
+    reunión quedaría como fantasma.
+  - La agenda del Senado no trae año: lo infiere `inferir_fecha`, con el día
+    de la semana como desempate, y cubre el cruce de diciembre a enero.
+- **Votaciones del Senado (`congreso_senado.py`)**:
+  - **Las actas solo linkean a los senadores EN FUNCIONES.** Los ex senadores
+    vienen sin ID: en un acta de 2008, 71 de 72 filas. Se resuelven por
+    nombre + provincia + **fecha** contra `ExportarListadoSenadoresHistorico`
+    (`IndiceSenadores`). La fecha desempata homónimos de épocas distintas. Si
+    no aparecen, entran con `external_id = nom-<hash>` y el voto no se pierde.
+  - **Los IDs de acta no son cronológicos**, y un ID inexistente devuelve 200
+    con la plantilla vacía. Mismo error que con el BORA: los IDs no dicen
+    nada de fechas ni de completitud.
+  - **La fecha del acta es la de la sesión, con la hora de la votación.** Una
+    votación de las 02:29 queda con el día en que empezó la sesión. Hay
+    excepciones con el acta fechada al día siguiente, y por eso
+    `_vincular_sesiones` cae a la sesión del día anterior.
+  - `POST /votaciones/actas` con `busqueda_actas[anio]` **no** pide CSRF (el
+    buscador de proyectos sí).
+  - Hay actas con celdas de voto vacías **en el propio sitio** (la 2530 tiene
+    62 de 72). Quedan como `otro`: no es un bug del parser.
+  - `congreso_sesion.periodo` del Senado queda NULL: las extraordinarias de
+    enero y febrero son del período anterior y el sitio no lo dice.
+  - El JSON de datos abiertos del Senado puede traer comas colgantes:
+    `cargar_json_tolerante`.
 - **`/v1` NO lleva `Cache-Control`** (ver `_CACHEABLE_PREFIXES` en `main.py`): una
   respuesta guardada 120 s en un proxy le hace creer al integrador que no hubo
   novedades. El feed interno sí, porque lo consume un browser.

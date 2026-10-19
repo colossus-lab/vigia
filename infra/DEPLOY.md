@@ -263,8 +263,30 @@ $W "from vigia_workers.congreso_hcdn import ingest_hcdn_asuntos as t; print(t(pe
 $W "from vigia_workers.congreso_hcdn import ingest_hcdn_agenda as t; print(t())"
 ```
 
-Al final reiniciar `worker-beat` para que tome los beats nuevos, y confirmar las
-fuentes en `GET /health/sources`.
+Senado (`senado_legisladores`, `senado_sesiones`, `senado_votaciones`,
+`senado_agenda`). Tampoco crean normas ni notifican:
+
+```bash
+$W "from vigia_workers.congreso_senado import ingest_senado_legisladores as t; print(t(dry_run=True))"
+$W "from vigia_workers.congreso_senado import ingest_senado_votaciones as t; print(t(dry_run=True)['votos'])"
+# carga inicial: legisladores primero (72 en ejercicio + ~406 ex senadores
+# desde 1983), así los ex senadores de las actas viejas no entran como alta
+# mínima sin mandato
+$W "from vigia_workers.congreso_senado import ingest_senado_legisladores as t; print(t())"
+$W "from vigia_workers.congreso_senado import ingest_senado_sesiones as t; print(t())"     # ~1800, 1983→
+# backfill de votaciones: ~13 min, ~2.100 actas, ~150k votos
+$W "from vigia_workers.congreso_senado import ingest_senado_votaciones as t; r = t(anio_desde=2008); r.pop('sin_votos'); print(r)"
+$W "from vigia_workers.congreso_senado import ingest_senado_agenda as t; print(t())"
+```
+
+Al final reiniciar `worker-beat` para que tome los beats nuevos y confirmar las
+fuentes en `GET /health/sources`. Chequeo del cruce con los proyectos (después
+de `backfill_expedientes`), tiene que dar > 0:
+
+```sql
+SELECT count(*) FROM votacion v JOIN norma n ON n.expedientes && v.expedientes;
+SELECT count(*) FROM asunto_tratado a JOIN norma n ON n.expedientes && a.expedientes;
+```
 
 **Rollback universal de una fuente** (cascade limpia matches y tracking):
 
