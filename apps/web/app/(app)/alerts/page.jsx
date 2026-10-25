@@ -2,20 +2,34 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { SECTORES } from '@/lib/constants';
+import { SECTORES, EMISORES } from '@/lib/constants';
+import { iconoEmisor } from '@/lib/emisores';
 import { authedFetch, AUTH_ENABLED } from '@/lib/authClient';
-import { Bell, Plus, Trash2, Power, PowerOff, Tag, Hash, Calendar, Info, Pencil, X } from 'lucide-react';
+import { Bell, Plus, Trash2, Power, PowerOff, Tag, Hash, Calendar, Info, Pencil, X, Building2 } from 'lucide-react';
 import FadeIn from '@/components/FadeIn';
 import CountUp from '@/components/CountUp';
 import { useCreditos } from '@/components/CreditosProvider';
 
 const INPUT_CLS = 'w-full bg-transparent border-b border-border-light px-1 py-2 text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-celeste transition-colors';
 
+// Título de la tarjeta: las keywords si hay; si no, el criterio que la define
+// (organismos y/o sectores).
+function tituloAlerta(alerta) {
+  const kws = alerta.keywords || [];
+  if (kws.length) return `“${kws.join('”, “')}”`;
+  const partes = [];
+  if ((alerta.emisores || []).length) partes.push(`Organismos: ${alerta.emisores.join(' · ')}`);
+  if ((alerta.sectores || []).length) partes.push(`Sectores: ${alerta.sectores.join(' · ')}`);
+  return partes.join(' — ') || 'Todas las normas';
+}
+
 // Form reutilizable: alta y edición comparten markup. `initial` pre-carga
-// keywords/sectores; `onSubmit` recibe el payload limpio { keywords, sectores }.
+// keywords/sectores/emisores; `onSubmit` recibe el payload limpio
+// { keywords, sectores, emisores }.
 function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
   const [keywords, setKeywords] = useState(initial?.keywords || []);
   const [sectores, setSectores] = useState(initial?.sectores || []);
+  const [emisores, setEmisores] = useState(initial?.emisores || []);
   const [draft, setDraft] = useState('');
   const [preview, setPreview] = useState(null); // { count_30d } | null
 
@@ -30,34 +44,38 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
   };
   const toggleSector = (s) =>
     setSectores((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]));
+  const toggleEmisor = (e) =>
+    setEmisores((p) => (p.includes(e) ? p.filter((x) => x !== e) : [...p, e]));
 
   // Preview de volumen: "≈ N normas en 30 días" para el criterio actual.
-  // Debounced; solo con keywords confirmadas + sectores (ignora el draft a medio
-  // tipear). Mata alertas muertas (N=0) y avisa de las ruidosas antes de crearlas.
+  // Debounced; solo con keywords confirmadas + sectores + emisores (ignora el
+  // draft a medio tipear). Mata alertas muertas (N=0) y avisa de las ruidosas
+  // antes de crearlas.
   useEffect(() => {
-    if (!onPreview || (!keywords.length && !sectores.length)) { setPreview(null); return; }
+    if (!onPreview || (!keywords.length && !sectores.length && !emisores.length)) { setPreview(null); return; }
     let cancel = false;
     const t = setTimeout(async () => {
       try {
-        const p = await onPreview({ keywords, sectores });
+        const p = await onPreview({ keywords, sectores, emisores });
         if (!cancel) setPreview(p);
       } catch { if (!cancel) setPreview(null); }
     }, 400);
     return () => { cancel = true; clearTimeout(t); };
-  }, [keywords, sectores, onPreview]);
+  }, [keywords, sectores, emisores, onPreview]);
 
   const submit = () => {
     // Volcar lo que quede tipeado sin confirmar.
     const kws = draft.trim() && !keywords.includes(draft.trim()) ? [...keywords, draft.trim()] : keywords;
-    // Válida con keywords O sectores (alerta por-sector = sin keywords).
-    if (!kws.length && !sectores.length) return;
-    onSubmit({ keywords: kws, sectores });
+    // Válida con keywords O sectores O emisores (alerta por-sector o por
+    // organismo = sin keywords).
+    if (!kws.length && !sectores.length && !emisores.length) return;
+    onSubmit({ keywords: kws, sectores, emisores });
   };
 
   return (
     <div className="animate-slide-up border-l-2 border-celeste pl-5 py-1">
       <div className="mb-4">
-        <label className="eyebrow text-[9px] block mb-2">Keywords <span className="text-text-tertiary normal-case font-normal">— Enter o coma para sumar · opcional si elegís sectores</span></label>
+        <label className="eyebrow text-[9px] block mb-2">Keywords <span className="text-text-tertiary normal-case font-normal">— Enter o coma para sumar · opcional si elegís sectores u organismos</span></label>
         <div className="flex flex-wrap items-center gap-1.5">
           {keywords.map((kw) => (
             <span key={kw} className="flex items-center gap-1 text-[11px] font-mono tint-blue border px-2 py-0.5 rounded-full">
@@ -90,10 +108,28 @@ function AlertaForm({ initial, onSubmit, onCancel, submitLabel, onPreview }) {
         </div>
       </div>
 
+      <div className="mb-4">
+        <label className="eyebrow text-[9px] block mb-2">Organismo emisor <span className="text-text-tertiary normal-case font-normal">— opcional, uno o varios (vacío = todos)</span></label>
+        <div className="flex flex-wrap gap-1.5">
+          {EMISORES.map(({ clave, label }) => {
+            const on = emisores.includes(clave);
+            const Icon = iconoEmisor(clave);
+            return (
+              <button key={clave} onClick={() => toggleEmisor(clave)} title={label}
+                className={`flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-full border transition-colors ${on ? 'tint-blue' : 'text-text-tertiary border-border-light hover:text-text-secondary hover:border-text-tertiary'}`}>
+                <Icon size={12} />
+                <span className="font-bold tracking-wide">{clave}</span>
+                <span className="opacity-60 hidden sm:inline">{label !== clave ? label : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {onPreview && preview && (
         <p className="text-[11px] font-mono mb-4 text-text-tertiary">
           {preview.count_30d === 0
-            ? '≈ 0 normas en los últimos 30 días — criterio muy angosto, revisá las keywords'
+            ? '≈ 0 normas en los últimos 30 días — criterio muy angosto, revisá el criterio'
             : `≈ ${preview.count_30d.toLocaleString('es-AR')} normas en los últimos 30 días`}
           {/* De normas a mails no es uno a uno: las que caen juntas en una
               corrida viajan en el mismo digest. El backend hace la cuenta. */}
@@ -141,29 +177,29 @@ export default function AlertsView() {
 
   useEffect(() => { load(); }, [load]);
 
-  const addAlerta = async ({ keywords, sectores }) => {
+  const addAlerta = async ({ keywords, sectores, emisores }) => {
     if (connected) {
       try {
-        await authedFetch('/alerts', { method: 'POST', body: JSON.stringify({ keywords, sectores }) });
+        await authedFetch('/alerts', { method: 'POST', body: JSON.stringify({ keywords, sectores, emisores }) });
         await load();
       } catch (e) { setErr(String(e.message || e)); }
     } else {
       setAlertas((prev) => [
-        { id: `local-${Date.now()}`, keywords, sectores, activa: true, matches: 0, last_match_at: null },
+        { id: `local-${Date.now()}`, keywords, sectores, emisores, activa: true, matches: 0, last_match_at: null },
         ...prev,
       ]);
     }
     setShowForm(false);
   };
 
-  const saveEdit = async (a, { keywords, sectores }) => {
+  const saveEdit = async (a, { keywords, sectores, emisores }) => {
     if (connected) {
       try {
-        await authedFetch(`/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ keywords, sectores }) });
+        await authedFetch(`/alerts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ keywords, sectores, emisores }) });
         await load();
       } catch (e) { setErr(String(e.message || e)); }
     } else {
-      setAlertas((prev) => prev.map((x) => (x.id === a.id ? { ...x, keywords, sectores } : x)));
+      setAlertas((prev) => prev.map((x) => (x.id === a.id ? { ...x, keywords, sectores, emisores } : x)));
     }
     setEditingId(null);
   };
@@ -212,7 +248,7 @@ export default function AlertsView() {
           <div>
             <p className="eyebrow mb-1"><span className="eyebrow-num">VIGÍA / ALERTAS</span><span className="ml-2">Monitoreo automático</span></p>
             <h2 className="display-section text-text-primary mb-1">Que la norma <em>te encuentre.</em></h2>
-            <p className="text-[13px] text-text-tertiary font-mono">keywords + sectores · matching horario · digest por email</p>
+            <p className="text-[13px] text-text-tertiary font-mono">keywords + sectores + organismos · matching horario · digest por email</p>
           </div>
           <button onClick={() => { setShowForm((v) => !v); setEditingId(null); }} className="flex items-center gap-1.5 px-4 py-2 btn-celeste rounded-full text-[11px] font-bold shrink-0">
             <Plus size={13} /> Nueva
@@ -249,7 +285,7 @@ export default function AlertsView() {
       {showForm && (
         <div className="mb-10">
           <p className="eyebrow mb-4"><span className="eyebrow-num">+</span><span className="ml-2">Nueva alerta</span></p>
-          <AlertaForm initial={{ keywords: [], sectores: [] }} onSubmit={addAlerta} onCancel={() => setShowForm(false)} submitLabel="Crear" onPreview={onPreview} />
+          <AlertaForm initial={{ keywords: [], sectores: [], emisores: [] }} onSubmit={addAlerta} onCancel={() => setShowForm(false)} submitLabel="Crear" onPreview={onPreview} />
         </div>
       )}
 
@@ -261,7 +297,7 @@ export default function AlertsView() {
               <div className="border-b border-border-light py-5">
                 <p className="eyebrow mb-4"><span className="eyebrow-num">✎</span><span className="ml-2">Editar alerta</span></p>
                 <AlertaForm
-                  initial={{ keywords: alerta.keywords || [], sectores: alerta.sectores || [] }}
+                  initial={{ keywords: alerta.keywords || [], sectores: alerta.sectores || [], emisores: alerta.emisores || [] }}
                   onSubmit={(payload) => saveEdit(alerta, payload)}
                   onCancel={() => setEditingId(null)}
                   submitLabel="Guardar"
@@ -276,16 +312,15 @@ export default function AlertsView() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="text-[14px] font-semibold text-text-primary truncate" style={{ fontFamily: 'var(--font-display)' }}>
-                        {(alerta.keywords || []).length
-                          ? `“${alerta.keywords.join('”, “')}”`
-                          : (alerta.sectores || []).length
-                            ? `Sectores: ${alerta.sectores.join(' · ')}`
-                            : 'Todas las normas'}
+                        {tituloAlerta(alerta)}
                       </h4>
                       {alerta.activa && <span className="text-[9px] font-medium tint-green border px-1.5 py-0.5 rounded-full shrink-0">activa</span>}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] text-text-tertiary font-mono">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-tertiary font-mono">
                       <span className="flex items-center gap-1"><Tag size={9} /> {(alerta.sectores || []).length ? alerta.sectores.join(' · ') : 'todos'}</span>
+                      {(alerta.emisores || []).length > 0 && (
+                        <span className="flex items-center gap-1"><Building2 size={9} /> {alerta.emisores.join(' · ')}</span>
+                      )}
                       <span className="flex items-center gap-1"><Hash size={9} /> {(alerta.matches || 0).toLocaleString('es-AR')} matches</span>
                       {alerta.last_match_at && <span className="flex items-center gap-1"><Calendar size={9} /> {alerta.last_match_at.slice(0, 10)}</span>}
                     </div>
