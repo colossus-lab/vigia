@@ -408,7 +408,9 @@ class Alerta(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
     keywords: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     sectores: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
-    emisores: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)  # 0013
+    emisores: Mapped[list[str]] = mapped_column(  # 0013
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     anchor_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

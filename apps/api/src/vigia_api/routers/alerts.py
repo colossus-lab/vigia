@@ -74,9 +74,7 @@ def _clean_emisores(emisores: list[str]) -> list[str]:
     return seen
 
 
-def _require_criterio(
-    keywords: list[str], sectores: list[str], emisores: list[str] | tuple = ()
-) -> None:
+def _require_criterio(keywords: list[str], sectores: list[str], emisores: list[str]) -> None:
     """Una alerta necesita al menos un criterio: keywords O sectores O emisores.
 
     Antes se exigía ≥1 keyword; ahora una alerta por-sector o por-emisor
@@ -184,7 +182,7 @@ async def list_alertas(ctx: Annotated[WorkspaceContext, Depends(require_active_p
     return [
         AlertaOut(
             id=a.id, keywords=a.keywords, sectores=a.sectores,
-            emisores=a.emisores or [], activa=a.activa,
+            emisores=a.emisores, activa=a.activa,
             matches=int(c or 0), last_match_at=a.last_match_at,
         )
         for a, c in rows
@@ -287,10 +285,15 @@ async def update_alerta(
 ) -> AlertaOut:
     """Edita una alerta. Solo aplica los campos provistos.
 
-    Cambiar el criterio (`keywords`/`sectores`/`emisores`) re-ancla la alerta a now() y
-    descarta los matches existentes (eran de otro criterio): la alerta arranca
-    limpia y solo notifica normas nuevas desde la edición. Togglear `activa` no
-    toca el ancla ni los matches.
+    Cambiar el criterio (`keywords`/`sectores`/`emisores`) re-ancla la alerta a
+    now() y descarta los matches existentes (eran de otro criterio): la alerta
+    arranca limpia y solo notifica normas nuevas desde la edición. Togglear
+    `activa` no toca el ancla ni los matches.
+
+    Mandar el MISMO criterio no cuenta como cambio. El form del web manda
+    siempre las tres listas, así que comparando solo "vino el campo" un
+    "Guardar" sin tocar nada le borraba a la alerta todo su historial de
+    matches. Se compara como conjunto: reordenar no cambia qué matchea.
     """
     _require_real_workspace(ctx)
     Session = get_sessionmaker()
@@ -303,19 +306,22 @@ async def update_alerta(
 
         criterio_cambio = False
         if body.keywords is not None:
-            a.keywords = _clean_keywords(body.keywords)
-            criterio_cambio = True
+            nuevo = _clean_keywords(body.keywords)
+            criterio_cambio |= set(nuevo) != set(a.keywords)
+            a.keywords = nuevo
         if body.sectores is not None:
-            a.sectores = _clean_sectores(body.sectores)
-            criterio_cambio = True
+            nuevo = _clean_sectores(body.sectores)
+            criterio_cambio |= set(nuevo) != set(a.sectores)
+            a.sectores = nuevo
         if body.emisores is not None:
-            a.emisores = _clean_emisores(body.emisores)
-            criterio_cambio = True
+            nuevo = _clean_emisores(body.emisores)
+            criterio_cambio |= set(nuevo) != set(a.emisores)
+            a.emisores = nuevo
         if body.activa is not None:
             a.activa = body.activa
 
         if criterio_cambio:
-            _require_criterio(a.keywords, a.sectores, a.emisores or [])
+            _require_criterio(a.keywords, a.sectores, a.emisores)
             a.anchor_at = func.now()
             a.last_match_at = None
             await session.execute(
@@ -328,7 +334,7 @@ async def update_alerta(
         )
     return AlertaOut(
         id=a.id, keywords=a.keywords, sectores=a.sectores,
-        emisores=a.emisores or [], activa=a.activa,
+        emisores=a.emisores, activa=a.activa,
         matches=int(count or 0), last_match_at=a.last_match_at,
     )
 

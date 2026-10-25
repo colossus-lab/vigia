@@ -29,7 +29,7 @@ const SECCIONES = [
     titulo: 'Qué datos guardamos',
     cuerpo: [
       <>Si creás una cuenta, guardamos lo que tu cuenta de Google nos da al iniciar sesión: <strong className="text-text-primary">email, nombre y foto de perfil</strong>. No accedemos a tu correo, contactos ni archivos.</>,
-      <>Además guardamos lo que vos creás dentro de la plataforma: tu workspace, sus miembros, las alertas que configurás (keywords y sectores) y los emails de las personas que invitás.</>,
+      <>Además guardamos lo que vos creás dentro de la plataforma: tu workspace, sus miembros, las alertas que configurás (keywords, sectores y organismos) y los emails de las personas que invitás.</>,
       <>Por seguridad y trazabilidad, registramos también datos técnicos de tu actividad de cuenta: tu <strong className="text-text-primary">dirección IP</strong>, el <strong className="text-text-primary">navegador y dispositivo</strong> (user-agent), la fecha de tu último acceso y un registro de eventos relevantes (inicios de sesión, invitaciones enviadas o aceptadas y cambios de membresía). Conservamos este registro por un máximo de <strong className="text-text-primary">12 meses</strong> y luego lo borramos automáticamente.</>,
     ],
   },

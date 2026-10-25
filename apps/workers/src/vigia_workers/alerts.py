@@ -158,8 +158,12 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                         {"ids": norma_ids},
                     )
                 ).all()
-                kw_label = ", ".join(a.keywords or []) or " · ".join(
+                # El rótulo lleva todo el criterio: "concentración" sola y
+                # "concentración" + CNDC son alertas distintas y en el mismo
+                # digest se verían iguales.
+                kw_label = " · ".join(
                     p for p in (
+                        ", ".join(a.keywords or []),
                         "organismos: " + ", ".join(a.emisores) if a.emisores else "",
                         "sectores: " + ", ".join(a.sectores) if a.sectores else "",
                     ) if p
