@@ -29,6 +29,16 @@ SECTORES: list[str] = [
     "Defensa", "Seguridad",
 ]
 
+# Claves de `norma.emisor` (organismo canónico) que acepta una alerta. Copia de
+# `vigia_connectors.emisores.EMISORES`, que es quien las escribe en ingesta: la
+# API no depende de los conectores. Si se suma un regulador hay que sumarlo en
+# los dos lados (lo chequea `test_emisores_sync.py`), o la API rechazaría con 422
+# una clave que la ingesta sí escribe.
+EMISORES: list[str] = [
+    "ARCA", "CNV", "CNDC", "BCRA", "ENACOM", "SSN", "ENRE", "ENARGAS",
+    "ANMAT", "UIF", "IGJ", "SENASA",
+]
+
 IMPACTOS: list[str] = ["alto", "medio", "bajo"]
 
 # Roles de membresía en un workspace. Hasta ahora solo existían como

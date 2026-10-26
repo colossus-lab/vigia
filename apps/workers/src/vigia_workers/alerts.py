@@ -1,9 +1,10 @@
 """Matching de normas contra alertas + envío de notificaciones.
 
 `match_alertas` corre tras cada ingesta (y por beat). Para cada alerta activa
-busca normas que matcheen su keyword (FTS español) y sector opcional, que no
-estén ya registradas en `alerta_match`, las inserta, y agrupa los matches
-nuevos por (usuario, workspace) para mandar un digest.
+busca normas que matcheen su keyword (FTS español), sector y emisor (todos
+opcionales, al menos uno), que no estén ya registradas en `alerta_match`, las
+inserta, y agrupa los matches nuevos por (usuario, workspace) para mandar un
+digest.
 
 Es el único lugar del sistema que cobra créditos: el digest es la única acción
 medida (ver `vigia_shared.creditos`). Sin cupo no se manda el mail, pero el
@@ -66,7 +67,7 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
             await session.execute(
                 text(
                     """
-                    SELECT a.id, a.keywords, a.sectores, a.anchor_at, a.workspace_id,
+                    SELECT a.id, a.keywords, a.sectores, a.emisores, a.anchor_at, a.workspace_id,
                            w.name AS ws_name, w.plan AS ws_plan, w.aporte AS ws_aporte,
                            u.email AS user_email
                     FROM alerta a
@@ -94,10 +95,17 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                 sector_clause = "AND n.sector = ANY(:sectores)"
                 params["sectores"] = a.sectores
 
+            # OR entre emisores (lista vacía = cualquier organismo). Es la alerta
+            # "por autoridad": todo lo que dicta la CNDC, el BCRA, …
+            emisor_clause = ""
+            if a.emisores:
+                emisor_clause = "AND n.emisor = ANY(:emisores)"
+                params["emisores"] = a.emisores
+
             # Una alerta necesita al menos un criterio. Con keywords → filtro FTS;
-            # sin keywords pero con sectores → alerta por-sector (matchea todas las
-            # normas del sector). Sin ninguno de los dos, nada que matchear.
-            if not ts_parts and not sector_clause:
+            # sin keywords pero con sectores o emisores → matchea todas las normas
+            # del sector / del organismo. Sin ninguno, nada que matchear.
+            if not ts_parts and not sector_clause and not emisor_clause:
                 continue
             ts_clause = f"AND n.search_vector @@ ({' || '.join(ts_parts)})" if ts_parts else ""
 
@@ -119,6 +127,7 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                                OR n.fecha_publicacion >= CURRENT_DATE - CAST(:ventana AS integer))
                           {ts_clause}
                           {sector_clause}
+                          {emisor_clause}
                           AND NOT EXISTS (
                               SELECT 1 FROM alerta_match m
                               WHERE m.alerta_id = :aid AND m.norma_id = n.id
@@ -149,8 +158,15 @@ async def _match_all(notify: bool = True) -> dict[str, Any]:
                         {"ids": norma_ids},
                     )
                 ).all()
-                kw_label = ", ".join(a.keywords or []) or (
-                    "sectores: " + ", ".join(a.sectores or [])
+                # El rótulo lleva todo el criterio: "concentración" sola y
+                # "concentración" + CNDC son alertas distintas y en el mismo
+                # digest se verían iguales.
+                kw_label = " · ".join(
+                    p for p in (
+                        ", ".join(a.keywords or []),
+                        "organismos: " + ", ".join(a.emisores) if a.emisores else "",
+                        "sectores: " + ", ".join(a.sectores) if a.sectores else "",
+                    ) if p
                 )
                 clave = (a.user_email, a.workspace_id)
                 _, _, _, items = digests.get(clave, ("", "", None, []))

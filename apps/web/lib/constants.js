@@ -19,3 +19,21 @@ export const SECTORES = [
   'Economía', 'Energía', 'Salud', 'Educación', 'Justicia', 'Trabajo', 'Ambiente', 'Tecnología',
   'Comercio', 'Transporte', 'Minería', 'Agro', 'Defensa', 'Seguridad',
 ];
+
+// Organismos emisores canónicos (`norma.emisor`) que acepta una alerta — espejo
+// de EMISORES en constants.py, mismo orden. La API rechaza con 422 una clave que
+// no esté allá.
+export const EMISORES = [
+  { clave: 'ARCA', label: 'Agencia de Recaudación (ex AFIP)' },
+  { clave: 'CNV', label: 'Comisión Nacional de Valores' },
+  { clave: 'CNDC', label: 'Defensa de la Competencia' },
+  { clave: 'BCRA', label: 'Banco Central' },
+  { clave: 'ENACOM', label: 'Ente Nacional de Comunicaciones' },
+  { clave: 'SSN', label: 'Superintendencia de Seguros' },
+  { clave: 'ENRE', label: 'Ente Regulador de la Electricidad' },
+  { clave: 'ENARGAS', label: 'Ente Regulador del Gas' },
+  { clave: 'ANMAT', label: 'ANMAT' },
+  { clave: 'UIF', label: 'Unidad de Información Financiera' },
+  { clave: 'IGJ', label: 'Inspección General de Justicia' },
+  { clave: 'SENASA', label: 'SENASA' },
+];

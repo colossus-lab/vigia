@@ -111,6 +111,7 @@ async def export_account(
                 "workspace_id": a.workspace_id,
                 "keywords": a.keywords,
                 "sectores": a.sectores,
+                "emisores": a.emisores,
                 "activa": a.activa,
                 "created_at": a.created_at,
             }

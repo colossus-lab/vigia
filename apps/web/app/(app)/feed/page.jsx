@@ -5,21 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
 import { TIPOS_NORMA } from '@/lib/constants';
-import {
-  Building2,
-  Landmark, Receipt, Antenna, Umbrella, Zap, Pill, Flame, Sprout, CandlestickChart, ShieldAlert, Scale,
-} from 'lucide-react';
+import { iconoEmisor } from '@/lib/emisores';
 import FadeIn from '@/components/FadeIn';
 import CountUp from '@/components/CountUp';
 import { Edicion } from '@/components/Edicion';
 import SupportBanner from '@/components/SupportBanner';
-
-// Icono por organismo emisor (lucide). Fallback a Building2.
-const EMISOR_ICON = {
-  BCRA: Landmark, ARCA: Receipt, ENACOM: Antenna, SSN: Umbrella, ENRE: Zap,
-  ANMAT: Pill, ENARGAS: Flame, SENASA: Sprout, CNV: CandlestickChart,
-  IGJ: Building2, UIF: ShieldAlert, CNDC: Scale,
-};
 
 function WeekTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -162,7 +152,7 @@ function FeedView() {
             <div className="flex flex-wrap items-center gap-1.5 mt-3">
               <span className="text-[9px] uppercase tracking-wider text-text-tertiary font-mono mr-1 shrink-0">Organismo</span>
               {emisores.map((e) => {
-                const Icon = EMISOR_ICON[e.emisor] || Building2;
+                const Icon = iconoEmisor(e.emisor);
                 const on = filterEmisor === e.emisor;
                 return (
                   <button

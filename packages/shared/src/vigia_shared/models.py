@@ -380,14 +380,16 @@ class ReunionComision(Base):
 
 
 class Alerta(Base):
-    """Suscripción de monitoreo por keywords (+ sectores opcionales), ligada a workspace.
+    """Suscripción de monitoreo por keywords, sectores y/o emisores, ligada a workspace.
 
     Reemplaza el `useState` efímero del frontend mock. El worker cruza las normas
     contra estas alertas y registra cada match en `alerta_match`.
 
-    `keywords`/`sectores` son listas (OR entre sí): la alerta matchea una norma
-    si pega ALGUNA keyword (FTS español) y la norma cae en ALGUNO de los sectores
-    (o cualquiera, si la lista está vacía). `anchor_at` es el piso temporal: solo
+    `keywords`/`sectores`/`emisores` son listas (OR dentro de cada una, AND entre
+    ellas): la alerta matchea una norma si pega ALGUNA keyword (FTS español), cae
+    en ALGUNO de los sectores y la dicta ALGUNO de los emisores (`norma.emisor`:
+    CNDC, ARCA, …). Una lista vacía no filtra; con las tres vacías la alerta no
+    es válida. `anchor_at` es el piso temporal: solo
     se notifican normas con `ingested_at >= anchor_at` (default = alta de la
     alerta; se reancla a now() al editar el criterio). Sin esto, una alerta nueva
     spamearía con todo el corpus histórico.
@@ -406,6 +408,9 @@ class Alerta(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
     keywords: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     sectores: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    emisores: Mapped[list[str]] = mapped_column(  # 0013
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     anchor_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
