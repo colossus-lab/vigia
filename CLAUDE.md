@@ -141,6 +141,24 @@ El web se redeploya solo con cada push (Vercel Git integration). Runbook complet
 - **Dedup BORA↔InfoLEG**: `reconcile_bora_infoleg` borra la fila BORA cuando llega la gemela InfoLEG, trasplantando antes los `alerta_match` con `notified=true` (anti doble-notificación). Solo LEY/DECRETO/DNU, con guard de instrumento (las Decisiones Administrativas numeran aparte).
 - **Orden de beats importa**: `ingest_hcdn_proyectos` (08:00) pisa `norma.estado` a diario; `ingest_hcdn_movimientos` (08:30) lo re-deriva. No invertirlos.
 - **Fuentes nuevas**: runbook en `infra/DEPLOY.md` (dry-run → backfill → `match_alertas(notify=False)` → beat). Registry con SLOs en `vigia_shared/sources.py`; estado operativo sin ssh en `GET /health/sources`.
+- **Geo-bloqueo: BORA y `datos.hcdn.gob.ar` solo responden desde Argentina**
+  (medido 2026-11-05: BORA descarta paquetes en 443 y 80 desde el 26/10; el
+  CKAN de Diputados resetea el TLS apenas llega el ClientHello desde el 4/11;
+  lo mismo desde EE.UU., Alemania y Brasil, 200 desde cualquier IP argentina).
+  No es la IP del EC2: cambiar la EIP no sirve. Esos dos hosts —y solo esos,
+  `_PROXY_AR_POR_HOST` en `vigia_connectors/_http.py`— salen por el **proxy
+  argentino que ya usa Licitar** (`VIGIA_PROXY_AR` en `.env.production`;
+  runbook en `infra/DEPLOY.md`, "Salida argentina"). `www.hcdn.gob.ar` es la
+  misma IP con otro vhost y responde directo, por eso no está en el set.
+  - **Sin la variable, el client de esos hosts revienta al construirse**
+    (`ProxyArNoConfigurado`) en vez de salir directo y comerse 60 s × 3
+    intentos por página. En dev y en una ingesta a mano desde Argentina el
+    valor es literalmente `direct`.
+  - **El síntoma de un geo-bloqueo nuevo es `ConnectTimeout`/`ConnectError`
+    solo en fuentes `.gob.ar` con el resto sano.** Antes de tocar infra: probar
+    el host desde check-host.net (nodos fuera de AR) y desde una conexión
+    argentina. Si solo falla afuera, es esto: sumar el host al set (y a
+    `test_proxy_ar.py`), no debuggear el EC2.
 - **BORA 2ª NO entra a `norma`**: va a `aviso_societario` (tabla y FTS propios, router `/avisos`, página "Radar societario") para no contaminar feed/stats/alertas.
 - **Plataforma gratuita, sin trial** (desde 2026-07-20): se eliminó el gating por free trial — `require_active_plan` ya no devuelve 402 `trial_expired` (solo exige sesión + membresía) y no hay cartel en el web. Los campos `trial_ends_at`/`VIGIA_TRIAL_DAYS` quedan inertes. La monetización es aporte voluntario: sección pública `/apoyar` (links de Mercado Pago de la Fundación Colossus Lab + CBU), con `/apoyar/gracias` como back URL de MP.
 - **Créditos: lo único medido es el mail de alerta** (desde 2026-08-21, `vigia_shared/creditos.py`,

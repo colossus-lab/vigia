@@ -396,6 +396,74 @@ Notas: el dump usa `--no-owner` (restaura con cualquier rol); `search_vector`
 es columna GENERATED — no viaja en el dump y se regenera sola al insertar.
 Verificar que el cron vive: `tail ~/vigia-backup.log` en el EC2.
 
+## Salida argentina (proxy AR)
+
+**EN PRODUCCIÓN desde 2026-11-05.** Dos fuentes nacionales bloquean todo el
+tráfico que no sale de Argentina, y el EC2 vive en us-east-1:
+
+| Host | Desde AWS (y EE.UU./DE/BR) | Desde Argentina | desde |
+|---|---|---|---|
+| `www.boletinoficial.gob.ar` | TCP 443 **y 80** timeout | 200 en 0,3 s | 2026-10-26 |
+| `datos.hcdn.gob.ar` (CKAN) | TLS reset apenas llega el ClientHello | 200 en 0,4 s | 2026-11-04 |
+
+Afecta `bora_primera`, `bora_segunda`, `hcdn_proyectos`, `hcdn_movimientos`,
+`hcdn_legisladores`, `bicameral_dnu` y el tramo CKAN de `hcdn_sesiones`.
+`www.hcdn.gob.ar` (misma IP, otro vhost) responde directo y sigue directo.
+
+**Cómo está hecho.** `make_client` (`vigia_connectors/_http.py`) tiene el set
+`_PROXY_AR_POR_HOST` con esos dos hosts. Solo esos salen por el proxy; InfoLEG
+y el resto siguen directos, porque el VPS es chico y mandarle el corpus entero
+lo convertiría en el cuello de botella. El proxy tuneliza el TLS con CONNECT,
+así que la verificación de certificados se sigue haciendo contra el portal. La
+URL vive en `VIGIA_PROXY_AR` en `.env.production`; la leen los dos workers por
+`env_file`. La API no construye estos clients y no la necesita.
+
+**Fail-fast a propósito:** si un host del set necesita el proxy y la variable
+no está, el client revienta al construirse (`ProxyArNoConfigurado`) con un
+mensaje que dice qué falta. La alternativa —salir directo desde AWS— tarda
+60 s × 3 intentos por página en fallar y deja la fuente en `error` con un
+`ConnectTimeout` que no explica nada. Para dev local o una ingesta a mano desde
+Argentina el valor es `VIGIA_PROXY_AR=direct`.
+
+**El VPS es el de Licitar** y no hay uno propio: LightNode en Buenos Aires con
+tinyproxy en el 8888, auth básica y `ufw` que solo acepta la IP elástica del
+EC2 (Vigía corre en ese mismo EC2, así que pasa el firewall sin tocar nada).
+El runbook de alta, hardening y reemplazo del VPS vive en
+`../Licitar/infra/DEPLOY.md`, "Salida argentina", y no se duplica acá. La URL
+con credencial está en `~/licitar/.env.production` del EC2 (`LICITAR_PROXY_AR`)
+y en `~/vigia/.env.production` (`VIGIA_PROXY_AR`), y en ningún otro lado:
+copiarla de uno a otro se hace **en el EC2**, sin que pase por una terminal
+local ni por el chat:
+
+```bash
+# En el EC2. Copia el valor de Licitar a Vigía sin imprimirlo.
+P=$(grep -E '^LICITAR_PROXY_AR=' ~/licitar/.env.production | cut -d= -f2-)
+grep -q '^VIGIA_PROXY_AR=' ~/vigia/.env.production   && sed -i "s#^VIGIA_PROXY_AR=.*#VIGIA_PROXY_AR=$P#" ~/vigia/.env.production   || echo "VIGIA_PROXY_AR=$P" >> ~/vigia/.env.production
+docker compose -f docker-compose.prod.yml --profile local-data up -d worker worker-beat
+```
+
+**Verificar** (desde el EC2, por el proxy, sin exponer la credencial):
+
+```bash
+P=$(grep -E '^VIGIA_PROXY_AR=' ~/vigia/.env.production | cut -d= -f2-)
+for u in https://www.boletinoficial.gob.ar/seccion/primera/$(date +%Y%m%d)          "https://datos.hcdn.gob.ar/api/3/action/package_show?id=proyectos-parlamentarios"; do
+  curl -s -o /dev/null --max-time 30 -x "$P" -w "%{http_code} %{time_total}s  $u
+" "$u"
+done
+```
+
+Medido 2026-11-05: BORA 1ª 200 en 1,6 s (108 KB), 2ª 200 en 1,6 s (158 KB),
+CKAN 200 en 2 s. Y después la ingesta real: `ingest_bora_primera` y
+`ingest_hcdn_proyectos` por `docker exec vigia-worker-1`, mirando
+`/health/sources`.
+
+**Un geo-bloqueo nuevo** se ve como `ConnectTimeout`/`ConnectError` en una
+fuente `.gob.ar` con el resto sano. Antes de tocar infra: probar el host desde
+check-host.net (nodos en EE.UU./DE/BR) y desde una conexión argentina. Si solo
+falla afuera, sumar el host a `_PROXY_AR_POR_HOST` y a `test_proxy_ar.py`.
+Tampoco es para siempre: vale re-probar directo cada tanto y sacar del set
+los que vuelvan a responder, para no cargar el VPS sin necesidad.
+
 ## Costos aproximados (us-east-1)
 EC2 t3.small (~$15) + RDS t4g.micro (~$13) + ElastiCache t4g.micro (~$12) ≈ **$40/mo**.
 Web en Vercel: free/pro. Bajar costos: EC2 all-in-one con perfil `local-data` (~$15/mo) hasta tener tráfico.
